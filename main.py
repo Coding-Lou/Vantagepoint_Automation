@@ -1,27 +1,32 @@
-from playwright.sync_api import sync_playwright
+import login
 import time
 
-USER_DATA_DIR = "C://Users//jlou//OneDrive - QCA Systems Ltd//Documents//Automation//edge_profile"
+def main():
+    #print("Input your choice: ")
+    #print("1 for AP Remittance")
+    #print("2 for AR Noticement")
+    #print("3 for quick amazon print")
+    #print("4 for export project status report")
+    #print("5 for month-end revenue audit (careful use not finished yet)")
 
-with sync_playwright() as p:
-    edge = p.chromium
-    context = edge.launch_persistent_context(
-        USER_DATA_DIR,
-        headless=False,
-        channel="msedge"
-    )
-    page = context.new_page()
-    page.goto("https://qcadeltek03.qcasystems.com/Vantagepoint/app")
-    print(page.title())
+    #userInput = input()
+    
+    #if (userInput == "1"): ap_main()
+    #if (userInput == "2"): ar_main()
+    #if (userInput == "3"): amazon_print()
+    #if (userInput == "4"): projectStatus_main()
+    #if (userInput == "5"): labour_process()
 
-    def log_request(request):
-       if "/Vantagepoint/vision/token" in request.url: 
-           print(f"Request URL: {request.url}")
-           print("Request headers:")
-           for k, v in request.headers.items():
-               print(f"  {k}: {v}")
-           print("=" * 60)
+    #projectStatus_main()
+    #amazon_print()
+    login.Sso_login()
+    print()
+    print("🎉Done, Have a good day. ")
 
-    page.on("request", log_request)
-    time.sleep(10)
-    context.close()
+if __name__=="__main__":
+    start_time = time.perf_counter()
+    main()
+    end_time = time.perf_counter()
+    total_seconds = end_time - start_time
+    minutes, seconds = divmod(int(total_seconds), 60)
+    print(f"Total execution time {minutes} minutes, {seconds} seconds")
