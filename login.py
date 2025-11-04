@@ -1,25 +1,41 @@
 from playwright.sync_api import sync_playwright
+import util
 import time, json
 
-USER_DATA_DIR = "C://Users//jlou//OneDrive - QCA Systems Ltd//Documents//Automation//edge_profile"
+USER_DATA_DIR = (
+    "C://Users//jlou//OneDrive - QCA Systems Ltd//Documents//Automation//edge_profile"
+)
+DOMAIN_FILTER = "qcadeltek03.qcasystems.com"
 
-def update_token(token):
-    print(token)
+def log_request(request):
+    if "/vision/token" not in request.url:
+        return
+    
+    # === retrieve token ===
+    token = None
+    for k, v in request.headers.items():
+        if "token" in k.lower():
+            token = v
+            util.update_config("TOKEN", token)
+
+    # === retrieve cookie ===
     try:
-        with open("Vantagepoint_Automation\config.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        config["TOKEN"] = token
-        
-        with open("Vantagepoint_Automation\config.json", "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-            f.flush()
+        context = request.frame.page.context
+        cookies = context.cookies()
 
-        print("💾 Token has been updated. ")
+        # filter domain cookies
+        filtered = [c for c in cookies if DOMAIN_FILTER in c["domain"]]
+
+        deduped = {}
+        for c in filtered:
+            deduped[c["name"]] = c
+
+        cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in deduped.values()])
+        util.update_config("COOKIE", cookie_str)
 
     except Exception as e:
-        print("⚠️ Token updated failed: ", e)
-
+        print("⚠️ Failed to get cookies:", e)
+        
 
 def Sso_login():
     with sync_playwright() as p:
@@ -30,17 +46,10 @@ def Sso_login():
             channel="msedge"
         )
         page = context.new_page()
+        page.on("request", log_request)
         page.goto("https://qcadeltek03.qcasystems.com/Vantagepoint/app")
 
-        def log_request(request):
-            if "/vision/token" in request.url: 
-                for k, v in request.headers.items():
-                    if ("token" in k):
-                        token = v
-                update_token(token)
-                
-        page.on("request", log_request)
         time.sleep(10)
+        
         context.close()
-    
     
