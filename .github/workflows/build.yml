@@ -20,8 +20,9 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $date = Get-Date -Format "yyyy.MM.dd"
-          'VERSION={0}' -f $date | Add-Content -Path $env:GITHUB_OUTPUT
+          $currentDate = Get-Date -Format "yyyy-MM-dd"
+          echo "Current date is: $currentDate"
+          echo "VERSION=$currentDate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,11 +41,11 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v_${{ steps.date.outputs.date }}"
-          name: "Release v_${{ steps.date.outputs.date }}"
+          tag_name: "v_${{ env.VERSION }}"
+          name: "Release v_${{ env.VERSION }}"
           body: |
             ✅ Auto Release Build
-            📅 Version: v_${{ steps.date.outputs.date }}
+            📅 Version: v_${{ env.VERSION }}
           files: dist/main.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
