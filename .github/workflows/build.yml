@@ -9,17 +9,13 @@ jobs:
   build:
     runs-on: windows-latest
 
-    env:
-      # Generate the version based on date
-      DATE_VERSION: ${{ steps.date.outputs.date }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get date string for version
-        id: date
-        run: echo "date=$(Get-Date -Format yyyy.MM.dd)" >> $env:GITHUB_OUTPUT
+      - name: Generate date version
+        id: version
+        run: echo "VERSION=$(Get-Date -Format yyyy.MM.dd)" >> $env:GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,12 +30,6 @@ jobs:
 
       - name: Build EXE
         run: pyinstaller --onefile main.py
-
-      - name: Upload Artifact (for backup)
-        uses: actions/upload-artifact@v4
-        with:
-          name: built-exe
-          path: dist/main.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
