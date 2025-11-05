@@ -21,7 +21,7 @@ jobs:
         shell: pwsh
         run: |
           $date = Get-Date -Format "yyyy.MM.dd"
-          Write-Output "VERSION=$date" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          'VERSION={0}' -f $date | Add-Content -Path $env:GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v5
