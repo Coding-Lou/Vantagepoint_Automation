@@ -18,7 +18,10 @@ jobs:
 
       - name: Generate date version
         id: version
-        run: echo "VERSION=$(Get-Date -Format yyyy.MM.dd)" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          Write-Output "VERSION=$date" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,11 +40,11 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "v${{ steps.date.outputs.date }}"
-          name: "Release ${{ steps.date.outputs.date }}"
+          tag_name: "v_${{ steps.date.outputs.date }}"
+          name: "Release v_${{ steps.date.outputs.date }}"
           body: |
             ✅ Auto Release Build
-            📅 Version: ${{ steps.date.outputs.date }}
+            📅 Version: v_${{ steps.date.outputs.date }}
           files: dist/main.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
