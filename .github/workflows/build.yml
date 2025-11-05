@@ -42,12 +42,7 @@ jobs:
           body: |
             ✅ Auto Release Build
             📅 Version: ${{ steps.date.outputs.date }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload EXE to Release
-        uses: softprops/action-gh-release@v2
-        with:
           files: dist/main.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
