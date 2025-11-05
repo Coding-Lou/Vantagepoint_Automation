@@ -1,22 +1,22 @@
 from playwright.sync_api import sync_playwright
 import util
 import time, json
+import os
+import requests
 
-USER_DATA_DIR = (
-    "C://Users//jlou//OneDrive - QCA Systems Ltd//Documents//Automation//edge_profile"
-)
-DOMAIN_FILTER = "qcadeltek03.qcasystems.com"
+USER_BROWSER_DIR = os.path.join(os.getcwd(), "edge_profile")
+DOMAIN_FILTER = "qcasystems"
+TOKEN = None
 
-def log_request(request):
+def set_token_cookies(request):
     if "/vision/token" not in request.url:
         return
     
     # === retrieve token ===
-    token = None
     for k, v in request.headers.items():
         if "token" in k.lower():
-            token = v
-            util.update_config("TOKEN", token)
+            TOKEN = v
+            util.update_config("TOKEN", TOKEN)
 
     # === retrieve cookie ===
     try:
@@ -31,25 +31,46 @@ def log_request(request):
             deduped[c["name"]] = c
 
         cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in deduped.values()])
-        util.update_config("COOKIE", cookie_str)
+        util.update_config("COOKIES", cookie_str)
 
     except Exception as e:
         print("⚠️ Failed to get cookies:", e)
-        
+
+def set_wwwbearer():
+    try:
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/token"
+        headers = {
+            "content-type": "application/json; charset=UTF-8"
+        }
+        payload = {
+            "sessionID": TOKEN,
+            "grant_type": "password",
+            "database": "VPProduction (QCADELTEK03)"
+        }
+        response = requests.post(url, headers = headers, data=payload)
+        data = response.json()
+        wwwbearer = data["access_token"]
+        util.update_config("WWWBEARER", wwwbearer)
+
+    except Exception as e:
+        print("❌ Login Failed, Please check the cookie and token in the configuration file.")
+
 
 def Sso_login():
     with sync_playwright() as p:
         edge = p.chromium
         context = edge.launch_persistent_context(
-            USER_DATA_DIR,
+            USER_BROWSER_DIR,
             headless=False,
             channel="msedge"
         )
         page = context.new_page()
-        page.on("request", log_request)
+        page.on("request", set_token_cookies)
         page.goto("https://qcadeltek03.qcasystems.com/Vantagepoint/app")
 
-        time.sleep(10)
+        time.sleep(3)
         
         context.close()
+    
+    set_wwwbearer()
     

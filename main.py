@@ -4,28 +4,29 @@ import util
 
 def main():
     print("Input your choice: ")
-    print("1 - AP Remittance")
-    print("2 - AR Noticement")
-    print("3 - export project status report")
-    print("4 - Merging Amazon Invoice PDF")
-    print("5 - Merging PDF")
-    print("6 - month-end revenue audit (careful use not finished yet)")
+    #print("1 - AP Remittance")
+    #print("2 - AR Noticement")
+    #print("3 - export project status report")
+    #print("4 - Merging Amazon Invoice PDF")
+    #print("5 - Merging PDF")
+    #print("6 - month-end revenue audit (careful use not finished yet)")
+    print("99 - Test New Approach to update cookie")
     print()
     print("0 - Exit the program")
     userInput = input()
     
     #if (userInput == "1"): ap_main()
     #if (userInput == "2"): ar_main()
-    if (userInput == "3"): util.merge_amazon_invoices()
-    if (userInput == "4"): util.merge_pdfs()
+    #if (userInput == "3"): util.merge_amazon_invoices()
+    #if (userInput == "4"): util.merge_pdfs()
     #if (userInput == "4"): projectStatus_main()
     #if (userInput == "5"): labour_process()
+    if (userInput == "99"): login.Sso_login()
 
     if (userInput == "0"): return
     
     #projectStatus_main()
     #amazon_print()
-    login.Sso_login()
     
 
 if __name__=="__main__":
