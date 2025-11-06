@@ -1,4 +1,3 @@
-from version import VERSION
 import login
 import time
 import util
@@ -8,8 +7,9 @@ import os
 import sys
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
-EXE_NAME = "main.exe" 
+EXE_NAME = "start.exe" 
 LOGIN = False
+VERSION = util.get_config("VERSION")
 
 def check_update():
     try:
