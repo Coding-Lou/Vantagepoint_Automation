@@ -34,6 +34,8 @@ def check_update():
                for chunk in download.iter_content(chunk_size=8192):
                    if chunk:
                        f.write(chunk)
+        
+        util.set_config("VERSION", latest_version)
 
         subprocess.Popen([temp_path, sys.argv[0]])
         print("Update started, exiting current program...")

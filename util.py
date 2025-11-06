@@ -26,7 +26,7 @@ def get_config(key):
     except Exception as e:
         print(f"⚠️ Get {key} failed: ", e)
 
-def update_config(key, value):
+def set_config(key, value):
     try:
         with open("config.json", "r", encoding="utf-8") as f:
             config = json.load(f)

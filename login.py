@@ -26,7 +26,7 @@ def set_wwwbearer():
         response = requests.post(url, headers = headers, data=payload)
         data = response.json()
         WWWBEARER = data["access_token"]
-        util.update_config("WWWBEARER", WWWBEARER)
+        util.set_config("WWWBEARER", WWWBEARER)
     except Exception as e:
         print("❌ Login Failed, Please check the cookie and token in the configuration file.")
 
@@ -55,7 +55,7 @@ def set_token_cookies(request):
             deduped[c["name"]] = c
 
         COOKIES = "; ".join([f"{c['name']}={c['value']}" for c in deduped.values()])
-        util.update_config("COOKIES", COOKIES)
+        util.set_config("COOKIES", COOKIES)
 
     except Exception as e:
         print("⚠️ Failed to get cookies:", e)
@@ -95,7 +95,7 @@ def set_asp_net_cookie():
 
     print(f"ASP_NET Cookie: " + asp_net_cookie)
     print(f"Current Cookies: {COOKIES}")
-    util.update_config("COOKIES", COOKIES)
+    util.set_config("COOKIES", COOKIES)
  
 def sso_login():
     global USER_BROWSER_DIR

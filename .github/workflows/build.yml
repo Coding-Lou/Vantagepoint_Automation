@@ -16,6 +16,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache Nuitka Compiler Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}/Nuitka
+          key: nuitka-cache
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}/pip/Cache
+          key: pip-cache
+
       - name: Generate date version
         id: version
         shell: pwsh
@@ -44,7 +56,7 @@ jobs:
 
       - name: Build EXE with Nuitka
         run: |
-          nuitka main.py --onefile --clang --lto=yes --output-filename=start.exe
+          nuitka main.py --onefile --clang --lto=yes --output-dir=dist --assume-yes-for-downloads --output-filename=start.exe 
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
