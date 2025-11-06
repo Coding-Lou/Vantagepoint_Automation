@@ -143,3 +143,8 @@ def assamble_projects(projects):
         searchOptions.append({"name":"selectedResultIds","value":project,"type":"wbs1","seq":2,"searchLevel":0,"valueDescription":"Monthly Maintenance"})
     
     return searchOptions
+
+def check_folder(folderName):
+    if not os.path.exists(folderName):
+        os.makedirs(folderName)
+        print(f"📁 Folder created: {folderName}")

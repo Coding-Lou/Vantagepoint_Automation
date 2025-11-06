@@ -20,6 +20,7 @@ def main():
     searchOptions = util.assamble_projects(projects)
     #period = input("Please input the period (202607): ")
     #set_period(period)
+    util.check_folder("project status")
     print()
     download_invoices()
     download_earnings()
