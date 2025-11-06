@@ -40,7 +40,7 @@ def set_token_cookies(request):
     for k, v in request.headers.items():
         if "token" in k.lower():
             TOKEN = v
-            util.update_config("TOKEN", TOKEN)
+            util.set_config("TOKEN", TOKEN)
 
     # === retrieve cookie ===
     try:

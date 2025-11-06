@@ -66,7 +66,7 @@ jobs:
           body: |
             ✅ Auto Release Build
             📅 Version: v_${{ env.VERSION }}
-          files: start.exe
+          files: dist/start.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
