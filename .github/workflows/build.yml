@@ -44,7 +44,7 @@ jobs:
 
       - name: Build EXE with Nuitka
         run: |
-          nuitka main.py --standalone --onefile --clang --lto=yes --output-filename=start.exe
+          nuitka main.py --onefile --clang --lto=yes --output-filename=start.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
