@@ -14,7 +14,7 @@ def show_welcome_banner():
         🔧 QCA Accounting Team Automation Script
     """
     print(banner)
-    print("🚀 Welcome! First-time setup in progress...\n")
+    print("🚀 Welcome! \n")
 
 def update_config(key, value):
     try:

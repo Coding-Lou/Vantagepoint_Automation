@@ -7,8 +7,32 @@ import requests
 USER_BROWSER_DIR = os.path.join(os.getcwd(), "edge_profile")
 DOMAIN_FILTER = "qcasystems"
 TOKEN = None
+WWWBEARER = None
+COOKIES = None
+
+def set_wwwbearer():
+    global TOKEN
+    global WWWBEARER
+    try:
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/token"
+        headers = {
+            "content-type": "application/json; charset=UTF-8"
+        }
+        payload = {
+            "sessionID": TOKEN,
+            "grant_type": "password",
+            "database": "VPProduction (QCADELTEK03)"
+        }
+        response = requests.post(url, headers = headers, data=payload)
+        data = response.json()
+        WWWBEARER = data["access_token"]
+        util.update_config("WWWBEARER", WWWBEARER)
+    except Exception as e:
+        print("❌ Login Failed, Please check the cookie and token in the configuration file.")
 
 def set_token_cookies(request):
+    global TOKEN
+    global COOKIES
     if "/vision/token" not in request.url:
         return
     
@@ -30,33 +54,51 @@ def set_token_cookies(request):
         for c in filtered:
             deduped[c["name"]] = c
 
-        cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in deduped.values()])
-        util.update_config("COOKIES", cookie_str)
+        COOKIES = "; ".join([f"{c['name']}={c['value']}" for c in deduped.values()])
+        util.update_config("COOKIES", COOKIES)
 
     except Exception as e:
         print("⚠️ Failed to get cookies:", e)
 
-def set_wwwbearer():
-    try:
-        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/token"
-        headers = {
-            "content-type": "application/json; charset=UTF-8"
-        }
-        payload = {
-            "sessionID": TOKEN,
-            "grant_type": "password",
-            "database": "VPProduction (QCADELTEK03)"
-        }
-        response = requests.post(url, headers = headers, data=payload)
-        data = response.json()
-        wwwbearer = data["access_token"]
-        util.update_config("WWWBEARER", wwwbearer)
+def set_asp_net_cookie():
+    global TOKEN
+    global COOKIES
+    global WWWBEARER
+    print(COOKIES)
+    # Build
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
+    HEADERS = {
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "content-type": "application/json; charset=UTF-8",
+        "www-bearer": WWWBEARER,
+        "Token": TOKEN,
+        "Cookie": COOKIES
+    }
+    payload = {"reportPath":"/Standard/AccountingGeneral/Remittance Advice","reportOptions":{"BankCode":"RBC-CDN","period":202607,"PostSeq":22,"ShowSSN":"N","checkpayee":"2","vendor":"UPSCAN","Employee":"","CheckNo":"'700000278'"}}
+    response = requests.post(url, headers=HEADERS, json=payload)
+    data = response.json()
+    report_path_raw = data["return"]["ReportPath"]
+    report_path = report_path_raw.replace(" ", "%20")
 
-    except Exception as e:
-        print("❌ Login Failed, Please check the cookie and token in the configuration file.")
+    # Get Nonce
+    url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+    payload = {}
+    response = requests.post(url, headers=HEADERS, json=payload)
+    nonce = response.json()
 
+    # Get Viewer
+    url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Remittance%20Advice"
+    response = requests.get(url, headers=HEADERS)
 
-def Sso_login():
+    asp_net_cookie = response.headers.get("Set-Cookie").split(";", 1)[0]
+    COOKIES = COOKIES + ";" + asp_net_cookie
+
+    print(f"ASP_NET Cookie: " + asp_net_cookie)
+    print(f"Current Cookies: {COOKIES}")
+    util.update_config("COOKIES", COOKIES)
+ 
+def sso_login():
+    global USER_BROWSER_DIR
     with sync_playwright() as p:
         edge = p.chromium
         context = edge.launch_persistent_context(
@@ -67,10 +109,8 @@ def Sso_login():
         page = context.new_page()
         page.on("request", set_token_cookies)
         page.goto("https://qcadeltek03.qcasystems.com/Vantagepoint/app")
-
-        time.sleep(3)
-        
+        time.sleep(5)
         context.close()
-    
+
     set_wwwbearer()
-    
+    set_asp_net_cookie()
