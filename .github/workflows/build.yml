@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  LOCALAPPDATA: ${{ runner.temp }}
-
 jobs:
   build:
     runs-on: windows-latest
@@ -22,13 +19,13 @@ jobs:
       - name: Cache Nuitka Compiler Cache
         uses: actions/cache@v4
         with:
-          path: ${{ env.LOCALAPPDATA }}/Nuitka
+          path: $env:TEMP/Nuitka
           key: nuitka-cache
 
       - name: Cache pip
         uses: actions/cache@v4
         with:
-          path: ${{ env.LOCALAPPDATA }}/pip/Cache
+          path: $env:TEMP/pip/Cache
           key: pip-cache
 
       - name: Generate date version
