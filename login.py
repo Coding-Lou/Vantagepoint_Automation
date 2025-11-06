@@ -64,18 +64,11 @@ def set_asp_net_cookie():
     global TOKEN
     global COOKIES
     global WWWBEARER
-    print(COOKIES)
     # Build
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
-    HEADERS = {
-        "accept": "application/json, text/javascript, */*; q=0.01",
-        "content-type": "application/json; charset=UTF-8",
-        "www-bearer": WWWBEARER,
-        "Token": TOKEN,
-        "Cookie": COOKIES
-    }
+    headers = util.set_headers()
     payload = {"reportPath":"/Standard/AccountingGeneral/Remittance Advice","reportOptions":{"BankCode":"RBC-CDN","period":202607,"PostSeq":22,"ShowSSN":"N","checkpayee":"2","vendor":"UPSCAN","Employee":"","CheckNo":"'700000278'"}}
-    response = requests.post(url, headers=HEADERS, json=payload)
+    response = requests.post(url, headers=headers, json=payload)
     data = response.json()
     report_path_raw = data["return"]["ReportPath"]
     report_path = report_path_raw.replace(" ", "%20")
@@ -83,18 +76,18 @@ def set_asp_net_cookie():
     # Get Nonce
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
     payload = {}
-    response = requests.post(url, headers=HEADERS, json=payload)
+    response = requests.post(url, headers=headers, json=payload)
     nonce = response.json()
 
     # Get Viewer
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Remittance%20Advice"
-    response = requests.get(url, headers=HEADERS)
+    response = requests.get(url, headers=headers)
 
     asp_net_cookie = response.headers.get("Set-Cookie").split(";", 1)[0]
     COOKIES = COOKIES + ";" + asp_net_cookie
 
-    print(f"ASP_NET Cookie: " + asp_net_cookie)
-    print(f"Current Cookies: {COOKIES}")
+    #print(f"ASP_NET Cookie: " + asp_net_cookie)
+    #print(f"Current Cookies: {COOKIES}")
     util.set_config("COOKIES", COOKIES)
  
 def sso_login():
