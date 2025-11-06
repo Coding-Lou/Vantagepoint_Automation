@@ -86,8 +86,8 @@ def set_asp_net_cookie():
     asp_net_cookie = response.headers.get("Set-Cookie").split(";", 1)[0]
     COOKIES = COOKIES + ";" + asp_net_cookie
 
-    print(f"ASP_NET Cookie: " + asp_net_cookie)
-    print(f"Current Cookies: {COOKIES}")
+    #print(f"ASP_NET Cookie: " + asp_net_cookie)
+    #print(f"Current Cookies: {COOKIES}")
     util.set_config("COOKIES", COOKIES)
  
 def sso_login():

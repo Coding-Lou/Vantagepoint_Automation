@@ -9,7 +9,8 @@ searchOptions = None
 
 def main():
     global searchOptions
-    userInput = input("Project Name(s) (use commas to separate multiple entries): " )
+    print("Project Name(s) (use commas to separate multiple entries): " )
+    userInput = input()
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
     if not projects:
@@ -19,11 +20,11 @@ def main():
     searchOptions = util.assamble_projects(projects)
     #period = input("Please input the period (202607): ")
     #set_period(period)
-
-    #download_invoices()
+    print()
+    download_invoices()
     download_earnings()
-    #download_expenses()
-    #download_labor_hours()
+    download_expenses()
+    download_labor_hours()
 
 def set_period(period):
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period

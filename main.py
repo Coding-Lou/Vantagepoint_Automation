@@ -64,8 +64,9 @@ def main():
         if (userInput == "0"): return
 
         if (not LOGIN and userInput in ["1", "2", "3", "6"]):
-            LOGIN = True
-            login.sso_login()
+            while not LOGIN:
+                login.sso_login()
+                LOGIN = util.check_login()
 
         #if (userInput == "1"): ap_main()
         #if (userInput == "2"): ar_main()
@@ -74,13 +75,9 @@ def main():
         if (userInput == "5"): util.merge_amazon_invoices()
         #if (userInput == "6"): labour_process()    
 
-        #projectStatus_main()
-        #amazon_print()
-    
-
 if __name__=="__main__":
-    #print("Checking if the program is latest version ...")
-    #check_update()
+    print("Checking if the program is latest version ...")
+    check_update()
     util.show_welcome_banner()
     start_time = time.perf_counter()
     main()

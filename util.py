@@ -2,6 +2,7 @@ import json
 from pypdf import PdfReader, PdfWriter
 from pathlib import Path
 import os
+import requests
 
 def show_welcome_banner():
     banner = r"""
@@ -37,12 +38,29 @@ def set_config(key, value):
             json.dump(config, f, indent=4, ensure_ascii=False)
             f.flush()
 
-        print(f"💾 {key} been updated to {value}. ")
-        print()
+        #print(f"💾 {key} been updated to {value}. ")
+        #print()
 
     except Exception as e:
         print(f"⚠️ {key} updated failed: ", e)
-        print()
+        #print()
+
+def check_login():
+    try: 
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/visionservices.asmx/GetIAccessConfiguration"
+        payload = {"sessionID": get_config("TOKEN")}
+        response = requests.post(url, headers = set_headers(), json = payload)
+        if response.status_code == 200:
+            data = response.json()
+            print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
+            print()
+            return True
+        else: 
+            print("❌ Login Failed, try again.")
+            return False
+    except:
+        print("❌ Error in function check_login()")
+        return False
 
 def merge_amazon_invoices():
     path = input("Please input the folder path: ")
