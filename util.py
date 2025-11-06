@@ -5,12 +5,12 @@ import os
 
 def show_welcome_banner():
     banner = r"""
-     ██████╗    ██████═╗   █████╗ 
-    ██╔═══██╗  ██      ║  ██╔══██╗
-    ██║   ██║  ██      ║  ███████║
-    ██║▄▄ ██║  ██      ║  ██╔══██║
-    ╚██████╔╝  ╚██████╔╝  ██║  ██║
-     ╚══▀▀═╝    ╚═════╝   ╚═╝  ╚═╝
+     ██████╗    ██████    █████╗ 
+    ██╔═══██╗  ██        ██╔══██╗
+    ██║   ██║  ██        ███████║
+    ██║▄▄ ██║  ██        ██╔══██║
+    ╚██████╔╝  ╚██████   ██║  ██║
+     ╚══▀▀═╝    ╚═════   ╚═╝  ╚═╝
         🔧 QCA Accounting Team Automation Script
                                             --- Made by Mr.Jay
     """
@@ -38,9 +38,11 @@ def set_config(key, value):
             f.flush()
 
         print(f"💾 {key} been updated to {value}. ")
+        print()
 
     except Exception as e:
         print(f"⚠️ {key} updated failed: ", e)
+        print()
 
 def merge_amazon_invoices():
     path = input("Please input the folder path: ")
@@ -104,3 +106,22 @@ def merge_pdfs(folder_path, output_filename):
 
     print(f"\n🎉 Success the merged pdf file：{output_path}")
 
+def set_headers():
+    WWWBEARER = get_config("WWWBEARER")
+    TOKEN = get_config("TOKEN")
+    COOKIES = get_config("COOKIES")
+    headers = {
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/json; charset=UTF-8",
+        "www-bearer": WWWBEARER,
+        "Token": TOKEN,
+        "Cookie": COOKIES
+    }
+    return headers
+
+def assamble_projects(projects):
+    searchOptions = [{"name":"Status","value":"[IS_EMPTY]","type":"dropdown","seq":1,"tableName":"PR","opp":"!=","condition":"and","searchLevel":1,"valueDescription":""}]
+    for project in projects:
+        searchOptions.append({"name":"selectedResultIds","value":project,"type":"wbs1","seq":2,"searchLevel":0,"valueDescription":"Monthly Maintenance"})
+    
+    return searchOptions

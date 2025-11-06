@@ -5,10 +5,10 @@ import subprocess
 import requests
 import os
 import sys
+import project_status
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
 EXE_NAME = "start.exe" 
-LOGIN = False
 VERSION = util.get_config("VERSION")
 
 def check_update():
@@ -46,33 +46,33 @@ def check_update():
         return
     
 def main():
-    login.sso_login()
-    #userInput = ""
-    #while userInput != "0":
-    #    print("Input your choice: ")
-    #    #print("1 - AP Remittance")
-    #    #print("2 - AR Noticement")
-    #    print("3 - Export project status report")
-    #    #print("4 - Merging Amazon Invoice PDF")
-    #    #print("5 - Merging PDF")
-    #    #print("6 - month-end revenue audit (careful use not finished yet)")
-    #    print()
-    #    print("0 - Exit the program")
-    #    print("--------------------------------------------------------")
-    #    userInput = input()
-    #    
-    #    if (userInput == "0"): return
+    LOGIN = False
+    userInput = ""
+    while userInput != "0":
+        print("Input your choice: ")
+        #print("1 - AP Remittance")
+        #print("2 - AR Noticement")
+        print("3 - Export project status report")
+        print("4 - Merging Amazon Invoice PDF")
+        print("5 - Merging PDF")
+        #print("6 - Bridge Report (careful use not finished yet)")
+        print()
+        print("0 - Exit the program")
+        print("--------------------------------------------------------")
+        userInput = input()
+        
+        if (userInput == "0"): return
 
-    #    if (not LOGIN and userInput in ["1", "2", "3", "6"]):
-    #        LOGIN = True
-    #        login.sso_login()
+        if (not LOGIN and userInput in ["1", "2", "3", "6"]):
+            LOGIN = True
+            login.sso_login()
 
         #if (userInput == "1"): ap_main()
         #if (userInput == "2"): ar_main()
-        #if (userInput == "3"): util.merge_amazon_invoices()
-        #if (userInput == "4"): util.merge_pdfs()
-        #if (userInput == "4"): projectStatus_main()
-        #if (userInput == "5"): labour_process()    
+        if (userInput == "3"): project_status.main()
+        if (userInput == "4"): util.merge_pdfs()
+        if (userInput == "5"): util.merge_amazon_invoices()
+        #if (userInput == "6"): labour_process()    
 
         #projectStatus_main()
         #amazon_print()
