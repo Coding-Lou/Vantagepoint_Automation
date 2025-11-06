@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  LOCALAPPDATA: ${{ runner.temp }}
+
 jobs:
   build:
     runs-on: windows-latest
