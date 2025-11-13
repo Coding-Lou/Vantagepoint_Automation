@@ -6,10 +6,16 @@ import requests
 import os
 import sys
 import project_status
+import csv
+from openpyxl import load_workbook
+import shutil
+import pandas as pd
+import ap
+
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
 EXE_NAME = "start.exe" 
-VERSION = util.get_config("VERSION")
+VERSION = util.get_config(["VERSION"])
 
 def check_update():
     try:
@@ -50,7 +56,7 @@ def main():
     userInput = ""
     while userInput != "0":
         print("Input your choice: ")
-        #print("1 - AP Remittance")
+        print("1 - AP Remittance")
         #print("2 - AR Noticement")
         print("3 - Export project status report")
         print("4 - Merging Amazon Invoice PDF")
@@ -63,12 +69,12 @@ def main():
         
         if (userInput == "0"): return
 
-        if (not LOGIN and userInput in ["1", "2", "3", "6"]):
-            while not LOGIN:
-                login.sso_login()
-                LOGIN = util.check_login()
+        #if (not LOGIN and userInput in ["1", "2", "3", "6"]):
+        #    while not LOGIN:
+        #        login.sso_login()
+        #        LOGIN = util.check_login()
 
-        #if (userInput == "1"): ap_main()
+        if (userInput == "1"): ap.ap_main()
         #if (userInput == "2"): ar_main()
         if (userInput == "3"): project_status.main()
         if (userInput == "4"): util.merge_pdfs()
@@ -76,8 +82,8 @@ def main():
         #if (userInput == "6"): labour_process()    
 
 if __name__=="__main__":
-    print("Checking if the program is latest version ...")
-    check_update()
+    #print("Checking if the program is latest version ...")
+    #check_update()
     util.show_welcome_banner()
     start_time = time.perf_counter()
     main()
@@ -86,4 +92,5 @@ if __name__=="__main__":
     minutes, seconds = divmod(int(total_seconds), 60)
     print(f"Total execution time {minutes} minutes, {seconds} seconds")
     print()
-    input("🎉Done, Have a good day. Press Enter to exit the script.")
+    print("🎉Done, Have a good day.")
+    input()

@@ -52,11 +52,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka ordered-set zstandard
+          pip install nuitka ordered-set zstandard playwright
 
       - name: Build EXE with Nuitka
         run: |
-          nuitka main.py --onefile --clang --lto=yes --output-dir=dist --assume-yes-for-downloads --output-filename=start.exe 
+          nuitka main.py --onefile --clang --lto=yes --output-dir=dist --assume-yes-for-downloads --output-filename=start.exe --include-package=playwright --include-package-data=playwright
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

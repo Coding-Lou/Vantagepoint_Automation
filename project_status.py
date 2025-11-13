@@ -3,48 +3,45 @@ import requests
 import re
 import os
 from datetime import date
+import pandas as pd
+from pathlib import Path
 
 HEADERS = util.set_headers()
 searchOptions = None
-
-def main():
-    global searchOptions
-    print("Project Name(s) (use commas to separate multiple entries): " )
-    userInput = input()
-    projects = [p.strip() for p in userInput.split(",") if p.strip()]
-
-    if not projects:
-        print("Error: Please enter at least one project name.")
-        return
-    
-    searchOptions = util.assamble_projects(projects)
-    #period = input("Please input the period (202607): ")
-    #set_period(period)
-    util.check_folder("project status")
-    print()
-    download_invoices()
-    download_earnings()
-    download_expenses()
-    download_labor_hours()
+output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
 
 def set_period(period):
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period
     response = requests.put(url, headers = HEADERS) 
 
+def csv_to_xlsx(csv_path, sheet_name, need_skip):
+    if need_skip:
+        df = pd.read_csv(csv_path, skiprows=3) 
+    else:
+        df = pd.read_csv(csv_path) 
+
+    file_exists = Path(output_file).exists()
+
+    with pd.ExcelWriter(output_file, engine="openpyxl", mode='a' if file_exists else 'w') as writer:
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    print("Copied to the output file.")
+
+
 def download_invoices():
     try:
         # Step 1: Build
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
-        payload = {"reportPath":"/Standard/AccountsReceivable/Invoice Register","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseChart3D":"N","baseChartColumn":"Other","baseChartDivisor":"1","baseChartFontSize":8,"baseChartHeight":3,"baseChartLabelLines":"N","baseChartLabels":"none","baseChartLeft":1,"baseChartLegendPosition":"righttop","baseChartSeriesColumn2":"","baseChartSeriesColumn3":"","baseChartShowPosition":"1","baseChartTitle":"","baseChartTop":0.5,"baseChartType":"none","baseChartWidth":6,"baseChartXTitle":"Primary Client Name","baseChartYTitle":"Other","baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"yyyy-MM-dd","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"N","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"Invoice Register","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"Y","baseStartColumnPosition":0.5,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[{"label":"Primary Client Name","sort":"ASC","color":"000000","subTotal":"N","showHeading":"N","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"clientName","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Project Number","sort":"ASC","color":"000000","subTotal":"N","showHeading":"N","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"projectNumber","customGridColumnSort":"","groupWBSLevel":"1"}],"ReportColumns":[{"heading":"Project","width":1,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"WBS1","username":"","customGridColumnSort":""},{"heading":"Date","width":0.7,"format":"yyyy-MM-dd","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"TransDate","username":"","customGridColumnSort":""},{"heading":"Invoice","width":1,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"InvoiceNumber","username":"","customGridColumnSort":""},{"heading":"Total","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"TotalAmt","username":"","customGridColumnSort":""},{"heading":"Prof Fees","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col1","username":"","customGridColumnSort":""},{"heading":"H/W Sales","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col2","username":"","customGridColumnSort":""},{"heading":"S/W Sales","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col3","username":"","customGridColumnSort":""},{"heading":"O/S Services","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col4","username":"","customGridColumnSort":""},{"heading":"Reimbursable","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col5","username":"","customGridColumnSort":""},{"heading":"EHF","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col6","username":"","customGridColumnSort":""},{"heading":"Other","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Other","username":"","customGridColumnSort":""},{"heading":"Taxes","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col7","username":"","customGridColumnSort":""},{"heading":"Net Revenue","width":1,"format":"###T###T###T###D##;(###T###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Net Revenue","header1":"Net Revenue","header2":"","detailExpression":"[TotalAmt]-[Col7]","groupExpression":"[TotalAmt]-[Col7]","queryJoin":"","checkSecurity":"N","altHeader1":"","altHeader2":"","queryColumn":"","calculatedColumnType":"ALLFRAMES","username":"","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":"","baseShowDetail":"Y","baseLeft1":0,"baseRight1":21,"baseLeft2":0,"baseRight2":8,"baseLeft3":0,"baseRight3":8,"baseSub":"1","rollType":"Project","timeframe":"JTD","radioTF":"radio1","tfCYJ":"J","clientInfo":"None","InterestCol":"0","txtShowLink":"N","baseRecordSelection":{"pKey":"","name":"Records Selected","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions":searchOptions},"_desc_saveOptionRole":["","",""],"saveOptionRole":["[CREATOR_USERNAME]","ACCOUNTANT","ACCOUNTING"],"baseOriginalFavoriteId":""}}
+        payload = {"reportPath":"/Standard/AccountsReceivable/Invoice Register","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseChart3D":"N","baseChartColumn":"Other","baseChartDivisor":"1","baseChartFontSize":8,"baseChartHeight":3,"baseChartLabelLines":"N","baseChartLabels":"none","baseChartLeft":1,"baseChartLegendPosition":"righttop","baseChartSeriesColumn2":"","baseChartSeriesColumn3":"","baseChartShowPosition":"1","baseChartTitle":"","baseChartTop":0.5,"baseChartType":"none","baseChartWidth":6,"baseChartXTitle":"Primary Client Name","baseChartYTitle":"Other","baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"yyyy-MM-dd","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"N","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"Invoice Register","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"Y","baseStartColumnPosition":0.5,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[{"label":"Primary Client Name","sort":"ASC","color":"000000","subTotal":"N","showHeading":"N","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"clientName","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Project Number","sort":"ASC","color":"000000","subTotal":"N","showHeading":"N","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"projectNumber","customGridColumnSort":"","groupWBSLevel":"1"}],"ReportColumns":[{"heading":"Project","width":1,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"WBS1","username":"","customGridColumnSort":""},{"heading":"Date","width":0.7,"format":"yyyy-MM-dd","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"TransDate","username":"","customGridColumnSort":""},{"heading":"Invoice","width":1,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"InvoiceNumber","username":"","customGridColumnSort":""},{"heading":"Total","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"TotalAmt","username":"","customGridColumnSort":""},{"heading":"Prof Fees","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col1","username":"","customGridColumnSort":""},{"heading":"H/W Sales","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col2","username":"","customGridColumnSort":""},{"heading":"S/W Sales","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col3","username":"","customGridColumnSort":""},{"heading":"O/S Services","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col4","username":"","customGridColumnSort":""},{"heading":"Reimbursable","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col5","username":"","customGridColumnSort":""},{"heading":"EHF","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col6","username":"","customGridColumnSort":""},{"heading":"Other","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Other","username":"","customGridColumnSort":""},{"heading":"Taxes","width":0.7,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Col7","username":"","customGridColumnSort":""},{"heading":"Net Revenue","width":1,"format":"###T###T###T###D##;(###T###T###T###D##);#","align":"right","sectionName":"","sectionRow":0,"sectionColumn":0,"columnID":"Net Revenue","header1":"Net Revenue","header2":"","detailExpression":"[TotalAmt]-[Col7]","groupExpression":"[TotalAmt]-[Col7]","queryJoin":"","checkSecurity":"N","altHeader1":"","altHeader2":"","queryColumn":"","calculatedColumnType":"ALLFRAMES","username":"DPALACIO","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":{"pKey":"","name":"","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions":searchOptions},"baseShowDetail":"Y","baseLeft1":0,"baseRight1":21,"baseLeft2":0,"baseRight2":8,"baseLeft3":0,"baseRight3":8,"baseSub":"1","rollType":"Project","timeframe":"JTD","radioTF":"radio1","tfCYJ":"J","clientInfo":"None","InterestCol":"0","txtShowLink":"N","baseSelectionRows":1,"baseOriginalFavoriteId":"385322010f1c4997b596c9017169c40b","_desc_saveOptionRole":["","",""],"saveOptionRole":["[CREATOR_USERNAME]","ACCOUNTANT","ACCOUNTING"]}}
         response = requests.post(url, headers=HEADERS, json=payload  )
         data = response.json()
         report_path_raw = data["return"]["ReportPath"]
         report_path = report_path_raw.replace(" ", "%20")
 
         # Step 2: Get Nonce
-        nonceUrl = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
         payload = {}
-        response = requests.post(nonceUrl, headers=HEADERS, json=payload  )
+        response = requests.post(url, headers=HEADERS, json=payload  )
         nonce = response.json()
 
         # Step 3: Get Viewer
@@ -83,6 +80,8 @@ def download_invoices():
                     if chunk:
                         f.write(chunk)
             print("✅ "+ csvName+" Downloaded")
+
+            csv_to_xlsx(csvName, "Invoice Export", True)
 
     except Exception as e:
         print("⚠️ Failed to download the invoices register:", e)
@@ -140,6 +139,8 @@ def download_earnings():
                         f.write(chunk)
             print("✅ "+ csvName+" Downloaded")
 
+            csv_to_xlsx(csvName, "proj export", True)
+
     except Exception as e:
         print("⚠️ Failed to download the project earnings:", e)
 
@@ -191,6 +192,8 @@ def download_expenses():
                     if chunk:
                         f.write(chunk)
             print("✅ "+ csvName+" Downloaded")
+
+            csv_to_xlsx(csvName, "exp export", False)
 
     except Exception as e:
         print("⚠️ Failed to download the invoices register:", e)
@@ -245,5 +248,29 @@ def download_labor_hours():
                         f.write(chunk)
             print("✅ "+ csvName+" Downloaded")
 
+            csv_to_xlsx(csvName, "hrs export", False)
+
     except Exception as e:
         print("⚠️ Failed to download the invoices register:", e)
+
+def main():
+    global searchOptions
+    global wb
+    print("Project Name(s) (use commas to separate multiple entries): " )
+    userInput = input()
+    projects = [p.strip() for p in userInput.split(",") if p.strip()]
+
+    if not projects:
+        print("Error: Please enter at least one project name.")
+        return
+    
+    searchOptions = util.assamble_projects(projects)
+    #period = input("Please input the period (202607): ")
+    #set_period(period)
+    util.check_folder("project status")
+    print()
+    download_invoices()
+    download_earnings()
+    download_expenses()
+    download_labor_hours()
+    print("The output file is: ", output_file)
