@@ -10,9 +10,6 @@ HEADERS = util.set_headers()
 searchOptions = None
 output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
 
-def set_period(period):
-    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period
-    response = requests.put(url, headers = HEADERS) 
 
 def csv_to_xlsx(csv_path, sheet_name, need_skip):
     if need_skip:

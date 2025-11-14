@@ -248,3 +248,8 @@ def download_with_progress(url, save_path, latest_version):
 
     print("\nDownload complete!\n")
     set_config("VERSION", latest_version)
+
+def change_period(period):
+    headers = set_headers()
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period
+    response = requests.put(url, headers = headers) 
