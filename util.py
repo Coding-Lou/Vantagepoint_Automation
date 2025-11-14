@@ -58,13 +58,13 @@ def check_login():
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/visionservices.asmx/GetIAccessConfiguration"
         payload = {"sessionID": get_config(["TOKEN"])}
         response = requests.post(url, headers = set_headers(), json = payload)
-        if response.status_code == 200:
+        cookies = get_config(["COOKIES"])
+        if response.status_code == 200 and "ASP.NET_SessionId" in cookies:
             data = response.json()
             print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
             print()
             return True
         else: 
-            print("❌ Login Failed, try again.")
             return False
     except:
         print("❌ Error in function check_login()")
@@ -225,7 +225,7 @@ def save_excel(wb, records):
     except Exception as e:
         print("❌Error in function save_excel()")
 
-def download_with_progress(url, save_path):
+def download_with_progress(url, save_path, latest_version):
     r = requests.get(url, stream=True)
     total = int(r.headers.get('content-length', 0))
 
@@ -247,3 +247,4 @@ def download_with_progress(url, save_path):
                 print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
 
     print("\nDownload complete!\n")
+    set_config("VERSION", latest_version)

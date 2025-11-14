@@ -32,8 +32,7 @@ def check_update():
 
         temp_new_exe = os.path.join(os.getenv("TEMP"), EXE_NAME)
 
-        util.download_with_progress(download_url, temp_new_exe)
-        util.set_config("VERSION", latest_version)
+        util.download_with_progress(download_url, temp_new_exe, latest_version)
         
         updater = os.path.join(os.path.dirname(sys.argv[0]), "updater.exe")
         subprocess.Popen([updater, sys.argv[0], temp_new_exe])
@@ -46,7 +45,7 @@ def check_update():
         return
 
 def main():
-    LOGIN = False
+    LOGIN = util.check_login()
 
     MENU = """
 ======================================================
@@ -73,7 +72,7 @@ def main():
         # Actions that require login
         login_required_actions = {"1", "2", "3", "6"}
         if userInput in login_required_actions and not LOGIN:
-            while not LOGIN:
+            while not LOGIN :
                 login.sso_login()
                 LOGIN = util.check_login()
 
