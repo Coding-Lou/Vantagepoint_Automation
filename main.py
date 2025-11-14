@@ -33,6 +33,7 @@ def check_update():
         temp_new_exe = os.path.join(os.getenv("TEMP"), EXE_NAME)
 
         util.download_with_progress(download_url, temp_new_exe)
+        util.set_config("VERSION", latest_version)
         
         updater = os.path.join(os.path.dirname(sys.argv[0]), "updater.exe")
         subprocess.Popen([updater, sys.argv[0], temp_new_exe])
@@ -46,36 +47,61 @@ def check_update():
 
 def main():
     LOGIN = False
-    userInput = ""
-    while userInput != "0":
-        print("Input your choice: ")
-        print("1 - AP Remittance")
-        print("2 - AR Noticement")
-        print("3 - Export project status report")
-        print("4 - Merging PDF")
-        #print("6 - Bridge Report (careful use not finished yet)")
-        print()
-        print("0 - Exit the program")
-        print("--------------------------------------------------------")
-        userInput = input()
-        
-        if (userInput == "0"): return
 
-        if (not LOGIN and userInput in ["1", "2", "3", "6"]):
+    MENU = """
+======================================================
+                   MAIN MENU
+======================================================
+  1) AP Remittance
+  2) AR Noticement
+  3) Export Project Status Report
+  4) Merge PDF
+
+  0) Exit
+======================================================
+"""
+
+    
+    while True:
+        print(MENU)
+        userInput = input("Enter your choice: ").strip()
+
+        if userInput == "0":
+            print("Exiting program...")
+            return
+
+        # Actions that require login
+        login_required_actions = {"1", "2", "3", "6"}
+        if userInput in login_required_actions and not LOGIN:
             while not LOGIN:
                 login.sso_login()
                 LOGIN = util.check_login()
 
-        if (userInput == "1"): ap.ap_main()
-        if (userInput == "2"): ar.ar_main()
-        if (userInput == "3"): project_status.main()
-        if userInput == "4":
-            option = input("Merge Amazon invoices? (Y/N): ")
-            if option.strip().upper().startswith("Y"):
+        # Handle menu selection
+        if userInput == "1":
+            ap.ap_main()
+
+        elif userInput == "2":
+            ar.ar_main()
+
+        elif userInput == "3":
+            project_status.main()
+
+        elif userInput == "4":
+            option = input("Merge Amazon invoices? (Y/N): ").strip().upper()
+            if option.startswith("Y"):
                 util.merge_amazon_invoices()
             else:
                 util.merge_pdfs()
-        #if (userInput == "6"): labour_process()    
+
+        # elif userInput == "6":
+        #     labour_process()
+
+        else:
+            print("Invalid option. Please try again.")
+
+        print("\n" + "-" * 55 + "\n")
+        print()
 
 if __name__=="__main__":
     print("Checking if the program is latest version ...")

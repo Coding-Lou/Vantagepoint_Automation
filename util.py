@@ -95,7 +95,7 @@ def merge_amazon_invoices():
 
     print(f"\n🎉 Success: {output_file}")
 
-def merge_pdfs(folder_path, output_filename):
+def merge_pdfs():
     folder_path = input("📂 Please input folder path of the pdf files: ").strip()
     output_filename = "merged_output.pdf"
 
