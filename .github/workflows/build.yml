@@ -14,13 +14,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Cache Nuitka Compiler Cache
-        uses: actions/cache@v4
-        with:
-          path: $env:TEMP/Nuitka
-          key: nuitka-cache
+      - uses: actions/checkout@v4
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -52,11 +46,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka ordered-set zstandard playwright
+          pip install pyinstaller playwright
 
-      - name: Build EXE with Nuitka
+      - name: Install Playwright Browsers (if needed)
         run: |
-          nuitka main.py --onefile --clang --lto=yes --output-dir=dist --assume-yes-for-downloads --output-filename=start.exe --include-package=playwright --include-package-data=playwright
+          python -m playwright install
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller main.py --onefile --name start --distpath dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -69,4 +67,3 @@ jobs:
           files: dist/start.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
