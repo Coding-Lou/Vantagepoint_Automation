@@ -7,8 +7,6 @@ import local_log
 from bs4 import BeautifulSoup
 import re
 import os
-from openpyxl.worksheet.table import Table
-from datetime import datetime
 
 HEADERS = util.set_headers()
 # Email
@@ -154,22 +152,6 @@ def ap_download_remittance(payment):
     except Exception as e:
         dual_out.tqdm.write("Error in download remittence")
 
-def save_excel():
-    global wb
-    try:
-        ws = wb.active
-        table_range = f"A1:I{RECORDS}"
-        if "Table1" in ws.tables:
-            del ws.tables["Table1"]
-        tab = Table(displayName = "Table1", ref = table_range)
-        ws.add_table(tab)
-        timestamp = datetime.now().strftime("%Y%m%d")
-        excelName = os.path.join( f"Job_{timestamp}.xlsx")
-        wb.save(excelName)
-
-        return excelName
-    except Exception as e:
-        print("❌Error in function save_excel()")
 
 def ap_main():
     util.check_folder("ap_export")
@@ -177,7 +159,7 @@ def ap_main():
     ap_setup_time()
     paymentsData = ap_get_remittance()
     ap_process_remittance(paymentsData)
-    save_excel()
+    util.save_excel(wb, RECORDS)
 
 if __name__ == '__main__':
     ap_main()

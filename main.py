@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 import shutil
 import pandas as pd
 import ap
-
+import ar
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
 EXE_NAME = "start.exe" 
@@ -57,10 +57,9 @@ def main():
     while userInput != "0":
         print("Input your choice: ")
         print("1 - AP Remittance")
-        #print("2 - AR Noticement")
+        print("2 - AR Noticement")
         print("3 - Export project status report")
-        print("4 - Merging Amazon Invoice PDF")
-        print("5 - Merging PDF")
+        print("4 - Merging PDF")
         #print("6 - Bridge Report (careful use not finished yet)")
         print()
         print("0 - Exit the program")
@@ -75,10 +74,14 @@ def main():
         #        LOGIN = util.check_login()
 
         if (userInput == "1"): ap.ap_main()
-        #if (userInput == "2"): ar_main()
+        if (userInput == "2"): ar.ar_main()
         if (userInput == "3"): project_status.main()
-        if (userInput == "4"): util.merge_pdfs()
-        if (userInput == "5"): util.merge_amazon_invoices()
+        if userInput == "4":
+            option = input("Merge Amazon invoices? (Y/N): ")
+            if option.strip().upper().startswith("Y"):
+                util.merge_amazon_invoices()
+            else:
+                util.merge_pdfs()
         #if (userInput == "6"): labour_process()    
 
 if __name__=="__main__":

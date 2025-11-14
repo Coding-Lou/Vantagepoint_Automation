@@ -3,6 +3,8 @@ from pypdf import PdfReader, PdfWriter
 from pathlib import Path
 import os
 import requests
+from openpyxl.worksheet.table import Table
+from datetime import datetime
 
 def show_welcome_banner():
     banner = r"""
@@ -180,3 +182,41 @@ def get_vendor_email(clientID):
         return email
     except Exception as e:
         print("❌ Error in function get_vendor_email()")
+
+def get_clientID(clientName):
+    try:
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/visionservices.asmx/GetLookupHash"
+        headers = set_headers()
+        payload = {
+            "sessionID": get_config(["TOKEN"]),
+            "hash":{
+                "filter": clientName,
+                "lookuptype": "clientvendor","vendorOnly":"N"
+            },
+            "page": 1,
+            "pagesize": 20,
+            "order": "name"
+        }
+        response = requests.post(url, headers=headers, json=payload)
+        records = response.json()
+        for record in records['d']:
+            if record['IsClient'] == "Y":
+                return record['Key']
+    except Exception as e:
+        print("❌ Error in function get_clientID() with input: " + clientName)
+
+def save_excel(wb, records):
+    try:
+        ws = wb.active
+        table_range = f"A1:I{records}"
+        if "Table1" in ws.tables:
+            del ws.tables["Table1"]
+        tab = Table(displayName = "Table1", ref = table_range)
+        ws.add_table(tab)
+        timestamp = datetime.now().strftime("%Y%m%d")
+        excelName = os.path.join( f"Job_{timestamp}.xlsx")
+        wb.save(excelName)
+
+        return excelName
+    except Exception as e:
+        print("❌Error in function save_excel()")
