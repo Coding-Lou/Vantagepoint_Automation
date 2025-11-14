@@ -16,17 +16,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache Nuitka Compiler Cache
-        uses: actions/cache@v4
-        with:
-          path: $env:TEMP/Nuitka
-          key: nuitka-cache
-
       - name: Cache pip
         uses: actions/cache@v4
         with:
-          path: $env:TEMP/pip/Cache
-          key: pip-cache
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Generate date version
         id: version
@@ -53,11 +49,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller playwright
-
-      - name: Install Playwright Browsers (if needed)
-        run: |
-          python -m playwright install
-
+          
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller main.py --onefile --name start --distpath dist
