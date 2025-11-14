@@ -6,10 +6,7 @@ import requests
 import os
 import sys
 import project_status
-import csv
 from openpyxl import load_workbook
-import shutil
-import pandas as pd
 import ap
 import ar
 
@@ -33,24 +30,20 @@ def check_update():
 
         print(f"New version found: {latest_version}. Downloading update...")
 
-        temp_path = os.path.join(os.getenv("TEMP"), EXE_NAME)
+        temp_new_exe = os.path.join(os.getenv("TEMP"), EXE_NAME)
 
-        with requests.get(download_url, stream=True) as download:
-           with open(temp_path, "wb") as f:
-               for chunk in download.iter_content(chunk_size=8192):
-                   if chunk:
-                       f.write(chunk)
+        util.download_with_progress(download_url, temp_new_exe)
         
-        util.set_config("VERSION", latest_version)
+        updater = os.path.join(os.path.dirname(sys.argv[0]), "updater.exe")
+        subprocess.Popen([updater, sys.argv[0], temp_new_exe])
 
-        subprocess.Popen([temp_path, sys.argv[0]])
-        print("Update started, exiting current program...")
+        print("Update started. Exiting old program...")
         sys.exit(0)
     
     except Exception as e:
         print(f"Failed to check/update version: {e}")
         return
-    
+
 def main():
     LOGIN = False
     userInput = ""
@@ -68,10 +61,10 @@ def main():
         
         if (userInput == "0"): return
 
-        #if (not LOGIN and userInput in ["1", "2", "3", "6"]):
-        #    while not LOGIN:
-        #        login.sso_login()
-        #        LOGIN = util.check_login()
+        if (not LOGIN and userInput in ["1", "2", "3", "6"]):
+            while not LOGIN:
+                login.sso_login()
+                LOGIN = util.check_login()
 
         if (userInput == "1"): ap.ap_main()
         if (userInput == "2"): ar.ar_main()
@@ -85,8 +78,8 @@ def main():
         #if (userInput == "6"): labour_process()    
 
 if __name__=="__main__":
-    #print("Checking if the program is latest version ...")
-    #check_update()
+    print("Checking if the program is latest version ...")
+    check_update()
     util.show_welcome_banner()
     start_time = time.perf_counter()
     main()

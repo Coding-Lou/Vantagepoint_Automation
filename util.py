@@ -7,15 +7,19 @@ from openpyxl.worksheet.table import Table
 from datetime import datetime
 
 def show_welcome_banner():
-    banner = r"""
-     ██████╗    ██████    █████╗ 
-    ██╔═══██╗  ██        ██╔══██╗
-    ██║   ██║  ██        ███████║
-    ██║▄▄ ██║  ██        ██╔══██║
-    ╚██████╔╝  ╚██████   ██║  ██║
-     ╚══▀▀═╝    ╚═════   ╚═╝  ╚═╝
-        🔧 QCA Accounting Team Automation Script
+    banner = rf"""
+         ██████╗    ██████    █████╗ 
+        ██╔═══██╗  ██        ██╔══██╗
+        ██║   ██║  ██        ███████║
+        ██║▄▄ ██║  ██        ██╔══██║
+        ╚██████╔╝  ╚██████   ██║  ██║
+         ╚══▀▀═╝    ╚═════   ╚═╝  ╚═╝
+    ──────────────────────────────────────────────────────────
+            🛠️  QCA Accounting Team Automation Script
+            🏷️  Version: {get_config(["VERSION"])}
+    ──────────────────────────────────────────────────────────
     """
+
     print(banner)
     print("🚀 Welcome! \n")
 
@@ -220,3 +224,26 @@ def save_excel(wb, records):
         return excelName
     except Exception as e:
         print("❌Error in function save_excel()")
+
+def download_with_progress(url, save_path):
+    r = requests.get(url, stream=True)
+    total = int(r.headers.get('content-length', 0))
+
+    downloaded = 0
+    chunk_size = 8192
+
+    print("\nDownloading update...\n")
+
+    with open(save_path, "wb") as f:
+        for chunk in r.iter_content(chunk_size):
+            if chunk:
+                f.write(chunk)
+                downloaded += len(chunk)
+
+                percent = downloaded / total * 100 if total else 0
+                bar = "█" * int(percent / 2)   # 50 chars bar
+                space = " " * (50 - len(bar))
+
+                print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
+
+    print("\nDownload complete!\n")
