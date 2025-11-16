@@ -5,6 +5,7 @@ import os
 import requests
 from openpyxl.worksheet.table import Table
 from datetime import datetime
+import pandas as pd
 
 def show_welcome_banner():
     banner = rf"""
@@ -253,3 +254,19 @@ def change_period(period):
     headers = set_headers()
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period
     response = requests.put(url, headers = headers) 
+
+def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
+    if need_skip:
+        df = pd.read_csv(csv_path, skiprows=3)
+    else:
+        df = pd.read_csv(csv_path)
+
+    if isinstance(left, int) and isinstance(right, int):
+        df = df.iloc[:, left:right+1] 
+    else:
+        df = df.loc[:, left:right] 
+
+    with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    print(f"Copied to the {output_file} / {sheet_name}")

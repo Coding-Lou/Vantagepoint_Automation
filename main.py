@@ -103,8 +103,8 @@ def main():
         print()
 
 if __name__=="__main__":
-    print("Checking if the program is latest version ...")
-    check_update()
+    #print("Checking if the program is latest version ...")
+    #check_update()
     util.show_welcome_banner()
     start_time = time.perf_counter()
     main()
