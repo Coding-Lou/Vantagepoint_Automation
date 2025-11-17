@@ -6,6 +6,9 @@ import requests
 from openpyxl.worksheet.table import Table
 from datetime import datetime
 import pandas as pd
+import local_log
+
+CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def show_welcome_banner():
     banner = rf"""
@@ -21,8 +24,8 @@ def show_welcome_banner():
     ──────────────────────────────────────────────────────────
     """
 
-    print(banner)
-    print("🚀 Welcome! \n")
+    CONSOLE_OUTPUT.tqdm_write(banner)
+    CONSOLE_OUTPUT.tqdm_write("🚀 Welcome! \n")
 
 def get_config(klist):
     try:
@@ -33,7 +36,7 @@ def get_config(klist):
         return config
     
     except Exception as e:
-        print(f"⚠️ Get config failed: ", e)
+        CONSOLE_OUTPUT.tqdm_write(f"⚠️ Get config failed: ", e)
         return None
 
 def set_config(key, value):
@@ -47,12 +50,10 @@ def set_config(key, value):
             json.dump(config, f, indent=4, ensure_ascii=False)
             f.flush()
 
-        print(f"💾 {key} been updated to {value}. ")
-        #print()
+        CONSOLE_OUTPUT.tqdm_write(f"💾 {key} been updated to {value}. ")
 
     except Exception as e:
-        print(f"⚠️ {key} updated failed: ", e)
-        #print()
+        CONSOLE_OUTPUT.tqdm_write(f"⚠️ {key} updated failed: ", e)
 
 def check_login():
     try: 
@@ -62,13 +63,13 @@ def check_login():
         cookies = get_config(["COOKIES"])
         if response.status_code == 200 and "ASP.NET_SessionId" in cookies:
             data = response.json()
-            print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
+            CONSOLE_OUTPUT.tqdm_write("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
             print()
             return True
         else: 
             return False
     except:
-        print("❌ Error in function check_login()")
+        CONSOLE_OUTPUT.tqdm_write("❌ Error in function check_login()")
         return False
 
 def merge_amazon_invoices():
@@ -87,21 +88,21 @@ def merge_amazon_invoices():
                 combined_writer.add_page(reader.pages[1])
             if len(reader.pages) >= 3:
                 combined_writer.add_page(reader.pages[2])
-            print(f"✅ Done: {pdf_file.name}")
+            CONSOLE_OUTPUT.tqdm_write(f"✅ Done: {pdf_file.name}")
         except Exception as e:
-            print(f"⚠️ Error {pdf_file.name}: {e}")
+            CONSOLE_OUTPUT.tqdm_write(f"⚠️ Error {pdf_file.name}: {e}")
 
     with open(output_file, "wb") as f:
         combined_writer.write(f)
 
-    print(f"\n🎉 Success: {output_file}")
+    CONSOLE_OUTPUT.tqdm_write(f"\n🎉 Success: {output_file}")
 
 def merge_pdfs():
     folder_path = input("📂 Please input folder path of the pdf files: ").strip()
     output_filename = "merged_output.pdf"
 
     if not os.path.isdir(folder_path):
-        print("❌ Invalid folder path")
+        CONSOLE_OUTPUT.tqdm_write("❌ Invalid folder path")
 
     pdf_writer = PdfWriter()
 
@@ -115,7 +116,7 @@ def merge_pdfs():
     pdf_files.sort(key=lambda f: os.path.getctime(f))
 
     if not pdf_files:
-        print("❌ No pdf files")
+        CONSOLE_OUTPUT.tqdm_write("❌ No pdf files")
         return
 
     for pdf_path in pdf_files:
@@ -123,15 +124,15 @@ def merge_pdfs():
             reader = PdfReader(pdf_path)
             for page in reader.pages:
                 pdf_writer.add_page(page)
-            print(f"✅ Add: {os.path.basename(pdf_path)}")
+            CONSOLE_OUTPUT.tqdm_write(f"✅ Add: {os.path.basename(pdf_path)}")
         except Exception as e:
-            print(f"⚠️ Skip {pdf_path}: {e}")
+            CONSOLE_OUTPUT.tqdm_write(f"⚠️ Skip {pdf_path}: {e}")
 
     output_path = os.path.join(folder_path, output_filename)
     with open(output_path, "wb") as out_file:
         pdf_writer.write(out_file)
 
-    print(f"\n🎉 Success the merged pdf file: {output_path}")
+    CONSOLE_OUTPUT.tqdm_write(f"\n🎉 Success the merged pdf file: {output_path}")
 
 def set_headers():
     WWWBEARER = get_config(["WWWBEARER"])
@@ -146,6 +147,19 @@ def set_headers():
     }
     return headers
 
+def init_workdir():
+    current_path = os.getcwd()
+    before, _, after = current_path.partition("OneDrive - QCA Systems Ltd")
+    if not after:  # key not found
+        raise ValueError(f'OneDrive - QCA Systems Ltd not found in current path: {current_path}')
+
+    ONEDRIVEDIR = before + "OneDrive - QCA Systems Ltd"
+    WORKDIR =  after.lstrip("\\")
+
+    set_config("ONEDRIVEDIR", ONEDRIVEDIR)
+    set_config("WORKDIR", WORKDIR)
+
+
 def assamble_projects(projects):
     searchOptions = [{"name":"Status","value":"[IS_EMPTY]","type":"dropdown","seq":1,"tableName":"PR","opp":"!=","condition":"and","searchLevel":1,"valueDescription":""}]
     for project in projects:
@@ -156,11 +170,12 @@ def assamble_projects(projects):
 def check_folder(folderName):
     if not os.path.exists(folderName):
         os.makedirs(folderName)
-        print(f"📁 Folder created: {folderName}")
+        CONSOLE_OUTPUT.tqdm_write(f"📁 Folder created: {folderName}")
 
 def clear_folder(folderName):
     onedrivedir = get_config(["ONEDRIVEDIR"])
     workdir = get_config(["WORKDIR"])
+
     folder_path = os.path.join(onedrivedir, workdir, folderName)
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
@@ -186,7 +201,7 @@ def get_vendor_email(clientID):
                         email += d["Email"]+";"
         return email
     except Exception as e:
-        print("❌ Error in function get_vendor_email()")
+        CONSOLE_OUTPUT.tqdm_write("❌ Error in function get_vendor_email()")
 
 def get_clientID(clientName):
     try:
@@ -208,7 +223,7 @@ def get_clientID(clientName):
             if record['IsClient'] == "Y":
                 return record['Key']
     except Exception as e:
-        print("❌ Error in function get_clientID() with input: " + clientName)
+        CONSOLE_OUTPUT.tqdm_write("❌ Error in function get_clientID() with input: " + clientName)
 
 def save_excel(wb, records):
     try:
@@ -224,7 +239,7 @@ def save_excel(wb, records):
 
         return excelName
     except Exception as e:
-        print("❌Error in function save_excel()")
+        CONSOLE_OUTPUT.tqdm_write("❌Error in function save_excel()")
 
 def download_with_progress(url, save_path, latest_version):
     r = requests.get(url, stream=True)
@@ -233,7 +248,7 @@ def download_with_progress(url, save_path, latest_version):
     downloaded = 0
     chunk_size = 8192
 
-    print("\nDownloading update...\n")
+    CONSOLE_OUTPUT.tqdm_write("\nDownloading update...\n")
 
     with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size):
@@ -245,9 +260,9 @@ def download_with_progress(url, save_path, latest_version):
                 bar = "█" * int(percent / 2)   # 50 chars bar
                 space = " " * (50 - len(bar))
 
-                print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
+                CONSOLE_OUTPUT.tqdm_write(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
 
-    print("\nDownload complete!\n")
+    CONSOLE_OUTPUT.tqdm_write("\nDownload complete!\n")
     set_config("VERSION", latest_version)
 
 def change_period(period):
@@ -269,4 +284,4 @@ def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
     with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    print(f"Copied to the {output_file} / {sheet_name}")
+    CONSOLE_OUTPUT.tqdm_write(f"Copied to the {output_file} / {sheet_name}")

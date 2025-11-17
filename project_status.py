@@ -5,11 +5,14 @@ import os
 from datetime import date
 from pathlib import Path
 import openpyxl
-
+import local_log
 
 HEADERS = util.set_headers()
 searchOptions = None
 output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
+
+# Log Conifg
+CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def init_output():
     if Path(output_file).exists():
@@ -70,15 +73,15 @@ def download_invoices():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ "+ csvName+" Downloaded")
+            CONSOLE_OUTPUT.tqdm_write("✅ "+ csvName+" Downloaded")
 
     except Exception as e:
-        print("⚠️ Failed to download the invoices register:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to download the invoices register:", e)
     
     try:
         util.csv_to_xlsx(csvName, output_file, "Invoice Export", True, 0, 12)
     except Exception as e:
-        print("⚠️ Failed to copy the data to output file:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def download_earnings():
     try:
@@ -133,14 +136,14 @@ def download_earnings():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ "+ csvName+" Downloaded")
+            CONSOLE_OUTPUT.tqdm_write("✅ "+ csvName+" Downloaded")
     except Exception as e:
-        print("⚠️ Failed to download the project earnings:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to download the project earnings:", e)
     
     try:
         util.csv_to_xlsx(csvName, output_file, "proj export", True, 1, 30)
     except Exception as e:
-        print("⚠️ Failed to copy the data to output file:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def download_expenses():
     try:
@@ -191,15 +194,15 @@ def download_expenses():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ "+ csvName+" Downloaded")
+            CONSOLE_OUTPUT.tqdm_write("✅ "+ csvName+" Downloaded")
 
     except Exception as e:
-        print("⚠️ Failed to download the invoices register:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to download the invoices register:", e)
 
     try:
         util.csv_to_xlsx(csvName, output_file, "exp export", False, 0, 13)
     except Exception as e:
-        print("⚠️ Failed to copy the data to output file:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def download_labor_hours():
     try:
@@ -251,14 +254,14 @@ def download_labor_hours():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ "+ csvName+" Downloaded")
+            CONSOLE_OUTPUT.tqdm_write("✅ "+ csvName+" Downloaded")
     except Exception as e:
-        print("⚠️ Failed to download the invoices register:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to download the invoices register:", e)
     
     try:
         util.csv_to_xlsx(csvName, output_file, "hrs export", False, 0, 14)
     except Exception as e:
-        print("⚠️ Failed to copy the data to output file:", e)
+        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def delete_default_sheet():
     wb = openpyxl.load_workbook(output_file)
@@ -268,19 +271,19 @@ def delete_default_sheet():
 
 def main():
     global searchOptions
-    print("Project Name(s) (use commas to separate multiple entries): " )
+    CONSOLE_OUTPUT.tqdm_write("Project Name(s) (use commas to separate multiple entries): " )
     userInput = input()
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
     if not projects:
-        print("Error: Please enter at least one project name.")
+        CONSOLE_OUTPUT.tqdm_write("Error: Please enter at least one project name.")
         return
     
     searchOptions = util.assamble_projects(projects)
     #period = input("Please input the period (202607): ")
     #set_period(period)
     util.check_folder("project status")
-    print()
+    CONSOLE_OUTPUT.tqdm_write()
     init_output()
     download_invoices()
     download_earnings()
@@ -289,4 +292,4 @@ def main():
     
     delete_default_sheet()
 
-    print("The output file is: ", output_file)
+    CONSOLE_OUTPUT.tqdm_write("The output file is: ", output_file)
