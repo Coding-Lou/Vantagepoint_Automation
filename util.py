@@ -36,8 +36,7 @@ def get_config(klist):
         for key in klist:
             if key not in node:
                 node[key] = ""
-            else:
-                node = node[key]
+            node = node[key]
 
         with open("config.json", "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
@@ -170,7 +169,7 @@ def init_workdir():
     if not after:
         print(f'⚠️ OneDrive - QCA Systems Ltd not found in current path: {current_path}, the power automate can not been used.')
         print()
-        set_config("WORKDIR", str(current_path))
+        set_config("ONEDRIVEDIR", str(current_path))
         return
 
     ONEDRIVEDIR = before + "OneDrive - QCA Systems Ltd"

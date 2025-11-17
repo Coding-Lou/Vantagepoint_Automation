@@ -7,12 +7,17 @@ from pathlib import Path
 import openpyxl
 import local_log
 
-HEADERS = util.set_headers()
-searchOptions = None
-output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
+def init_global():
+    global HEADERS
+    HEADERS = util.set_headers()
+    global searchOptions
+    searchOptions = None
+    global output_file
+    output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
 
-# Log Conifg
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+    # Log Conifg
+    global CONSOLE_OUTPUT
+    CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def init_output():
     if Path(output_file).exists():
@@ -270,9 +275,9 @@ def delete_default_sheet():
     wb.save(output_file)
 
 def main():
+    init_global()
     global searchOptions
-    CONSOLE_OUTPUT.tqdm_write("Project Name(s) (use commas to separate multiple entries): " )
-    userInput = input()
+    userInput = input("Project Name(s) (use commas to separate multiple entries): " )
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
     if not projects:
@@ -283,7 +288,6 @@ def main():
     #period = input("Please input the period (202607): ")
     #set_period(period)
     util.check_folder("project status")
-    CONSOLE_OUTPUT.tqdm_write()
     init_output()
     download_invoices()
     download_earnings()
