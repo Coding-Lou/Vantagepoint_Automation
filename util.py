@@ -35,7 +35,7 @@ def get_config(klist):
         node = config
         for key in klist:
             if key not in node:
-                node[key] = {}
+                node[key] = ""
             else:
                 node = node[key]
 

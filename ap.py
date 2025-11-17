@@ -27,9 +27,9 @@ def init_output():
     ws = wb.active
     ws.title = "Sheet1"
     ws.append(["ClientID","From","To","CC","Subject","AttachmentName","AttachmentContent","Body","Payee"])
+    util.clear_folder("ap_export")
 
 def ap_setup_time():
-    util.clear_folder("ap_export")
     date = input("Input the Remittance Date (format 2025-05-01): ")
     
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/UserSettings"
