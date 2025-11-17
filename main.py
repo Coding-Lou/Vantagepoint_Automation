@@ -51,15 +51,14 @@ def main():
 ======================================================
                    MAIN MENU
 ======================================================
-  1) AP Remittance
-  2) AR Noticement
-  3) Export Project Status Report
+  1) AP - Remittance
+  2) AR - Statements
+  3) Report Preparation - Project Status Report
   4) Merge PDF
 
   0) Exit
 ======================================================
 """
-
     
     while True:
         print(MENU)
@@ -103,9 +102,10 @@ def main():
         print()
 
 if __name__=="__main__":
-    #print("Checking if the program is latest version ...")
-    #check_update()
+    print("Checking if the program is latest version ...")
+    check_update()
     util.show_welcome_banner()
+    util.init_workdir()
     start_time = time.perf_counter()
     main()
     end_time = time.perf_counter()

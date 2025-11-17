@@ -29,6 +29,7 @@ def format_amount(val):
     return f"{val:,.2f}" if val and val > 0 else ""
 
 def ar_init():
+    util.check_folder("ar_export")
     util.clear_folder("ar_export")
     global STATEMENTDATE
     STATEMENTDATE = input("Statement Date (format 2025-05-01): ")
@@ -171,7 +172,7 @@ def ar_details(clientID):
     response = requests.get(url, headers = HEADERS)
     records = response.json()
     for r in records:
-        if r['Total'] < 0:
+        if r['Total'] <= 0:
             continue
         ar_download_proj_invoice_pdf(r['WBS1'], clientID)
         CONSOLE_OUTPUT.tqdm_write('✅ ' + r['WBS1'] + " invoice download")
@@ -239,7 +240,7 @@ def ar_generate_invoices_table(clientID):
     message = ""
     global DUEINVOICE
     for r in records:
-        if r['Total'] < 0:
+        if r['Total'] <= 0:
             continue
         projectID = r['WBS1']
         projectID = projectID.replace("/","[_$2F_]")
@@ -269,6 +270,8 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
     response = requests.get(url, headers=HEADERS)
     invoices = response.json()
     for invoice in invoices: 
+        if abs(invoice['Total']) < 1e-9:
+            continue
         clientName = invoice['ClientName']
         clientName = clientName.replace("/"," ")
         try:
@@ -415,7 +418,6 @@ def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent
     RECORDS += 1
 
 def ar_main():
-    util.check_folder("ar_export")
     ar_init()
     init_output()
     ar_download_csv()

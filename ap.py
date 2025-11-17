@@ -4,7 +4,6 @@ from openpyxl import Workbook
 import requests
 from tqdm import tqdm
 import local_log
-from bs4 import BeautifulSoup
 import re
 import os
 
@@ -41,7 +40,7 @@ def ap_setup_time():
 
 def ap_get_remittance():
     try:
-        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/CheckReview/?startRow=1&pageSize=1000&initialLoad=true&   sortDef=CheckDate_A&offset=0"
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/CheckReview/?startRow=1&pageSize=1000&initialLoad=true&sortDef=CheckDate_A&offset=0"
         response = requests.get(url, headers=HEADERS )
 
         paymentsData = response.json()
@@ -51,7 +50,7 @@ def ap_get_remittance():
         return paymentsData
     
     except:
-        print("❌ Error in function ap_get_remittance")
+        CONSOLE_OUTPUT.tqdm_write("❌ Error in function ap_get_remittance")
 
 def ap_process_remittance(paymentsData):
     i = 0
@@ -150,7 +149,7 @@ def ap_download_remittance(payment):
             CONSOLE_OUTPUT.tqdm_write("Msg: ", response.content[:500])
 
     except Exception as e:
-        dual_out.tqdm.write("Error in download remittence")
+        CONSOLE_OUTPUT.tqdm_write("Error in download remittence")
 
 
 def ap_main():
