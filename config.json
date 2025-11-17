@@ -1,10 +1,5 @@
 {
     "VERSION": "2025-11-17",
-    "COOKIES": "apt.uid=AP-TYQBTXFEX0HX-2-1762147729773-81665589.0.2.30aa9067-44f2-465c-883a-788c94abf85b; apt.sid=AP-TYQBTXFEX0HX-2-1763359030911-22779741; Vantagepoint=; zdgtm_session=e0idiobUlFFSCPOJHaVYZI4J4J0zIhighv2Yhjr%2BohA%3D;ASP.NET_SessionId=jayuqhl3mas00rjhhlossruw",
-    "TOKEN": "c77fd60248e94ad7b571f8c4c60ccfff",
-    "WWWBEARER": "c1PIB6RhyQXdMWnZrLqgwxBciEPjhx46MFmehPw5MxUcrxywD9oEBo7Sktw6a6UBwoC9m24uA6iV76SCnbHAb96SDVy12v82unqnSdaaw00ONTPDqTvgnGhxsmrx_brpVTJ04poyWU3YmFkV720vxZ_fmkbRTNSh_A1O8lUL0MsKTso9Qt-jqtQggkWVDK2pmr56iuNr56LZ6-1fljGqE2abwTfkwjNTi9v2clG7GuT4crpLKPdC9InAkkDHSAXEN39_MdeW2tmuBAmmPXf5B_jyBluSa2vgpo9KI-PEJzmR08df_NMQRnDlH_ykq1m2O-bgQ3sFabVgOa1tPsJ3v2rzJF5qGcAWETVFGhk8s1Pxt9ogSahYIdNus4CoVWYs",
-    "ONEDRIVEDIR": "C:\\Users\\jlou\\OneDrive - QCA Systems Ltd",
-    "WORKDIR": "C:\\Vantagepoint_Automation",
     "AP": {
         "EXCLUDE": [
             "FASTEN",
@@ -41,5 +36,10 @@
         "SUBJECT": "Important Notice: Your Statement of ",
         "OPTIONALMSG": "",
         "BODY": "<p>To prevent any interruption to your account or payment processing, we strongly recommend using one of the following alternative payment methods:<br/><p><b>E-Transfer:</b><br/>Send to ar@qcasystem.com and include your Client Number and Invoice Numbers in the memo line.<br/></p><b>Electronic Funds Transfer (EFT):</b><br/>Please email ar@qcasystems.com to request our banking details.</p><p><b>Credit Card Payment:</b><br/>Call us at 604-940-0868 to make a payment over the phone.<br/>(Please note: A 5% processing fee applies.)</p><p>If you choose to mail a cheque during this period, please be advised that delivery and processing times may be affected. Payment deadlines will remain in place, and late fees or service disruptions may apply if payments are not received on time.<br/>If your account is already set up for EFT, you may disregard this message.<br/><br/>We appreciate your understanding and cooperation.<br/>If you have any questions or need assistance, feel free to contact us.</p><p>Thank you for your continued business.</p><p>Best regards,</p><p><strong>QCA Systems Ltd</strong> | <em>Engineering Solutions</em><br><a href='http://www.qcasystems.com' target='_blank'>www.qcasystems.com</a><br><strong>Services:</strong> Electrical Engineering | PLC | HMI | Drives | Panels | Database | Vision</p>"
-    }
+    },
+    "ONEDRIVEDIR": "C:\\Vantagepoint_Automation",
+    "TOKEN": "5eaa6487378d4c4586dc732de9d26f21",
+    "WWWBEARER": "W2IbferBQaxYc6xSC3zGQRUD2srrzPLxrIE8ijcbN4MbIkkFqHpBIh0lu9a7KHTsEa52WVw2olrgy4kiwqulcw8eJPCINO1Upof031N7vmEeB5UqlFwVXy2KynWsWyc89mSa9jGatennM6MDmY-mrCsIGy27A5qi5FPliacvHzNKPaHX0PlZFGQKEidkhXxN3Kp_52WUo9VjEqnW2vhUFjCmJwrCw6-nnlyH5QGPHwGbzCNnapqK1k1PMQYdhmjCtIct2-zgMzBKd-rVIuNqIfZ13QL8Of-hEh3qBOcxqc0Fbbh8YMhC9eRXDieL5Ks_SkfXMTMtckSJ7vWfTRb0CXmX295gyiJeHMTKuA7xnAv5pZmxt2xu1TcB178lOjmw",
+    "COOKIES": "apt.sid=AP-TYQBTXFEX0HX-2-1763365556638-82924257; apt.uid=AP-TYQBTXFEX0HX-2-1763365556638-96351989.0.2.30aa9067-44f2-465c-883a-788c94abf85b; zdgtm_session=G8TDZiWBaOsqqc8SrJbUre5Vynfzo2SlnZD46bELZxo%3D; Vantagepoint=;ASP.NET_SessionId=sddnxcbcifnfj2htwewszgvz",
+    "WORKDIR": ""
 }
