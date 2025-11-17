@@ -7,6 +7,7 @@ from openpyxl.worksheet.table import Table
 from datetime import datetime
 import pandas as pd
 import local_log
+import glob
 
 CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
@@ -31,12 +32,20 @@ def get_config(klist):
     try:
         with open("config.json", "r", encoding="utf-8") as f:
             config = json.load(f)
+        node = config
         for key in klist:
-            config = config[key]
-        return config
+            if key not in node:
+                node[key] = {}
+            else:
+                node = node[key]
+
+        with open("config.json", "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+            
+        return node
     
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write(f"⚠️ Get config failed: ", e)
+        CONSOLE_OUTPUT.tqdm_write(f"⚠️ Get config failed")
         return None
 
 def set_config(key, value):
@@ -149,9 +158,20 @@ def set_headers():
 
 def init_workdir():
     current_path = os.getcwd()
+    pattern = os.path.join(".", "job*.xlsx")
+
+    for file_path in glob.glob(pattern):
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}: {e}")
+    
     before, _, after = current_path.partition("OneDrive - QCA Systems Ltd")
-    if not after:  # key not found
-        raise ValueError(f'OneDrive - QCA Systems Ltd not found in current path: {current_path}')
+    if not after:
+        print(f'⚠️ OneDrive - QCA Systems Ltd not found in current path: {current_path}, the power automate can not been used.')
+        print()
+        set_config("WORKDIR", str(current_path))
+        return
 
     ONEDRIVEDIR = before + "OneDrive - QCA Systems Ltd"
     WORKDIR =  after.lstrip("\\")
@@ -260,7 +280,7 @@ def download_with_progress(url, save_path, latest_version):
                 bar = "█" * int(percent / 2)   # 50 chars bar
                 space = " " * (50 - len(bar))
 
-                CONSOLE_OUTPUT.tqdm_write(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
+                print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
 
     CONSOLE_OUTPUT.tqdm_write("\nDownload complete!\n")
     set_config("VERSION", latest_version)
