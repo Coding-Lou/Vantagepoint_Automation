@@ -23,6 +23,14 @@ jobs:
           $currentDate = Get-Date -Format "yyyy-MM-dd"
           echo "VERSION=$currentDate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
 
+      - name: Update version in config.json
+        shell: pwsh
+        run: |
+          $jsonPath = "config.json"
+          $config = Get-Content $jsonPath | ConvertFrom-Json
+          $config.version = $env:VERSION
+          $config | ConvertTo-Json -Depth 10 | Set-Content $jsonPath -Encoding utf8
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -30,19 +38,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka ordered-set zstandard
-          pip install playwright
-        
-      - name: Build EXE with Nuitka
+          pip install pyinstaller==5.13.2
+          
+      - name: Build EXE with PyInstaller
         run: |
-          python -m nuitka --onefile --enable-plugin=playwright --output-filename=start.exe main.py
-
-      - name: Move output
-        run: |
-          mkdir dist
-          mv start.exe dist/start.exe
+          pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium main.py main.py 
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
