@@ -16,28 +16,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
       - name: Generate date version
         id: version
         shell: pwsh
         run: |
           $currentDate = Get-Date -Format "yyyy-MM-dd"
           echo "VERSION=$currentDate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
-
-      - name: Update version in config.json
-        shell: pwsh
-        run: |
-          $jsonPath = "config.json"
-          $config = Get-Content $jsonPath | ConvertFrom-Json
-          $config.version = $env:VERSION
-          $config | ConvertTo-Json -Depth 10 | Set-Content $jsonPath -Encoding utf8
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,10 +33,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller playwright
-          
+        
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install --with-deps
+
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller main.py --onefile --name start --distpath dist
+          pyinstaller --onefile --name start --distpath dist main.py 
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
