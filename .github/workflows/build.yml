@@ -37,11 +37,7 @@ jobs:
         
       - name: Build EXE with Nuitka
         run: |
-          python -m nuitka ^
-            --onefile ^
-            --enable-plugin=playwright ^
-            --output-filename=start.exe ^
-            main.py
+          python -m nuitka --onefile --enable-plugin=playwright --output-filename=start.exe main.py
 
       - name: Move output
         run: |
