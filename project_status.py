@@ -296,4 +296,5 @@ def main():
     
     delete_default_sheet()
 
-    CONSOLE_OUTPUT.tqdm_write(f"The output file is: output_{date.today().strftime("%Y-%m-%d")}.xlsx")
+    CONSOLE_OUTPUT.tqdm_write(f'The output file is: output_{date.today().strftime("%Y-%m-%d")}.xlsx')
+
