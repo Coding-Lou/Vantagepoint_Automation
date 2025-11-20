@@ -298,3 +298,5 @@ def main():
 
     CONSOLE_OUTPUT.tqdm_write(f'The output file is: output_{date.today().strftime("%Y-%m-%d")}.xlsx')
 
+if __name__ == '__main__':
+    main()

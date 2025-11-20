@@ -107,3 +107,6 @@ def sso_login():
 
     set_wwwbearer()
     set_asp_net_cookie()
+
+if __name__ == "__main__":
+    print()
