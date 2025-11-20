@@ -21,7 +21,8 @@ jobs:
         shell: pwsh
         run: |
           $currentDate = Get-Date -Format "yyyy-MM-dd"
-          echo "VERSION=$currentDate" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
+          $rand = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 4 | ForEach-Object {[char]$_})
+          echo "VERSION=$currentDate_$rand" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8
 
       - name: Update version in config.json
         shell: pwsh
