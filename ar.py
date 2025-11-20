@@ -9,34 +9,31 @@ from openpyxl import Workbook
 from datetime import datetime
 import zipfile
 
-def init_global():
-    global HEADERS
-    HEADERS = util.set_headers()
-    # Email
-    global MAIL_FROM
-    MAIL_FROM = util.get_config(["AP", "FROM"])
-    global CC
-    CC = util.get_config(["AP", "CC"])
-    global SUBJECT
-    SUBJECT = util.get_config(["AP", "SUBJECT"])
-    global BODY
-    BODY = util.get_config(["AP", "BODY"])
-    global OPTIONALMSG
-    OPTIONALMSG = util.get_config(['AR', 'OPTIONALMSG'])
-    # Output location
-    global ONEDRIVEDIR
-    ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
-    global WORKDIR
-    WORKDIR = util.get_config(['WORKDIR'])
-    # Log Conifg
-    global CONSOLE_OUTPUT
-    CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
-    global RECORDS
-    RECORDS = 1
-    global STATEMENTDATE
-    STATEMENTDATE = None
-
-
+global HEADERS
+HEADERS = util.set_headers()
+# Email
+global MAIL_FROM
+MAIL_FROM = util.get_config(["AP", "FROM"])
+global CC
+CC = util.get_config(["AP", "CC"])
+global SUBJECT
+SUBJECT = util.get_config(["AP", "SUBJECT"])
+global BODY
+BODY = util.get_config(["AP", "BODY"])
+global OPTIONALMSG
+OPTIONALMSG = util.get_config(['AR', 'OPTIONALMSG'])
+# Output location
+global ONEDRIVEDIR
+ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
+global WORKDIR
+WORKDIR = util.get_config(['WORKDIR'])
+# Log Conifg
+global CONSOLE_OUTPUT
+CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+global RECORDS
+RECORDS = 1
+global STATEMENTDATE
+STATEMENTDATE = None
 
 def format_amount(val):
     return f"{val:,.2f}" if val and val > 0 else ""
@@ -433,7 +430,6 @@ def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent
 def ar_main():
     ar_init()
     init_output()
-    init_global()
     ar_download_csv()
     zipClientName = ar_process()
     

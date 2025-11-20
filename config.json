@@ -1,5 +1,5 @@
 {
-    "VERSION": "2025-11-19",
+    "VERSION": "2025-11-20",
     "AP": {
         "EXCLUDE": [
             "FASTEN",
@@ -38,7 +38,8 @@
         "BODY": "<p>To prevent any interruption to your account or payment processing, we strongly recommend using one of the following alternative payment methods:<br/><p><b>E-Transfer:</b><br/>Send to ar@qcasystem.com and include your Client Number and Invoice Numbers in the memo line.<br/></p><b>Electronic Funds Transfer (EFT):</b><br/>Please email ar@qcasystems.com to request our banking details.</p><p><b>Credit Card Payment:</b><br/>Call us at 604-940-0868 to make a payment over the phone.<br/>(Please note: A 5% processing fee applies.)</p><p>If you choose to mail a cheque during this period, please be advised that delivery and processing times may be affected. Payment deadlines will remain in place, and late fees or service disruptions may apply if payments are not received on time.<br/>If your account is already set up for EFT, you may disregard this message.<br/><br/>We appreciate your understanding and cooperation.<br/>If you have any questions or need assistance, feel free to contact us.</p><p>Thank you for your continued business.</p><p>Best regards,</p><p><strong>QCA Systems Ltd</strong> | <em>Engineering Solutions</em><br><a href='http://www.qcasystems.com' target='_blank'>www.qcasystems.com</a><br><strong>Services:</strong> Electrical Engineering | PLC | HMI | Drives | Panels | Database | Vision</p>"
     },
     "ONEDRIVEDIR": "C:\\Vantagepoint_Automation",
-    "TOKEN": "6b03463574e1426684448c9270d85f2c",
-    "WWWBEARER": "XSB8Uw6DXam6C6frA413nnWOgAdubes9WqYIKma8rrEfWgLG01FdSPP-bAURSsR0gfQlFm8UkGu-tPS58K9Y6-KmsfqED_Chz4bnn9pHXUgui-taL6I9Wdd49qLG0wQYF34zx7xDV8tl2AD8ZNscoy5Ws4zIJiMtYjDCKU2xddVsyPt00xsdMUahs5o2JJBZ14_-yfox9hmMiWNVGVf7g0jY2I40bNc9yqNh_R-14dF2hIahKCjb1xMVmJxVmYgj2V97cLZjF200iGSSEyfRwD0i0lh5n6nm6Ji0NIphsgpiQB9l_7U0thNLny9jgAU-8QtHrTCpSg6E0wm0F9DyIl4ZkwNwwrOgKNtZMKA3sNk2JDAaicgGR3Qy6iz-UTOU",
-    "COOKIES": "apt.uid=AP-TYQBTXFEX0HX-2-1763365556638-96351989.0.2.30aa9067-44f2-465c-883a-788c94abf85b; apt.sid=AP-TYQBTXFEX0HX-2-1763592679807-73397249; Vantagepoint=; zdgtm_session=Q06fQtYqOmY5EFi9QHaNIpitHjrrHEWHQznZixl6lfo%3D;ASP.NET_SessionId=ihi34eun1dzpkvltxe5hamop"
+    "TOKEN": "360585e5373941058efb429679318d98",
+    "WWWBEARER": "9ip4DrVhpxdqEVGjyZKy1hepBnppfmCNONHXpECOSCO-NKkfB3RLg7zlgR1k8BXH0top71k3pxC9zlztyySnuJ-FCtfbyHSMTxeWBEdSUa2E7eGye0Tz5nVfMoHg_pzKd5OJmAVzfCZs24C-1xppGwC-4HvN258MFaGQ2717B-rETkGiB5YQkfWKb03xBg5O3B_BBvQb6l-AKOeTJjlNsL3C_kAekGEuRyDtQ5NsJ4AIGA8h0VbYO8hS20mApdVvMBtFddnJTc7F2C9FbKqfyzvKiiWlrI3ghQqzFd_MhqQ-btB11fqMLYuGrl6D9kNRgtPT5U-_3Q4V2nXjwNdgUzv9IUMnVvl0-uPJX0PoGQBbimjy2GbWmicwgTbc-Zaw",
+    "COOKIES": "apt.uid=AP-TYQBTXFEX0HX-2-1763365556638-96351989.0.2.30aa9067-44f2-465c-883a-788c94abf85b; apt.sid=AP-TYQBTXFEX0HX-2-1763670987005-28746169; Vantagepoint=; zdgtm_session=7DypPBEORfbvW2IBf0lKGUNoBgnd12tR5cKEJ%2BpZwB4%3D;ASP.NET_SessionId=snprxnqbbbhvmiqpgn5asnqi",
+    "WORKDIR": ""
 }
