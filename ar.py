@@ -13,13 +13,13 @@ global HEADERS
 HEADERS = util.set_headers()
 # Email
 global MAIL_FROM
-MAIL_FROM = util.get_config(["AP", "FROM"])
+MAIL_FROM = util.get_config(["AR", "FROM"])
 global CC
-CC = util.get_config(["AP", "CC"])
+CC = util.get_config(["AR", "CC"])
 global SUBJECT
-SUBJECT = util.get_config(["AP", "SUBJECT"])
+SUBJECT = util.get_config(["AR", "SUBJECT"])
 global BODY
-BODY = util.get_config(["AP", "BODY"])
+BODY = util.get_config(["AR", "BODY"])
 global OPTIONALMSG
 OPTIONALMSG = util.get_config(['AR', 'OPTIONALMSG'])
 # Output location
