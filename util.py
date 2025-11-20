@@ -77,6 +77,9 @@ def check_login():
         else: 
             return False
     except:
+        set_config("TOKEN", "")
+        set_config("WWWBEARER", "")
+        set_config("COOKIES", "")
         CONSOLE_OUTPUT.tqdm_write("❌ Error in function check_login()")
         return False
 
