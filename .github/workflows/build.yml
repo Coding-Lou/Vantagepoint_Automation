@@ -41,6 +41,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller==5.13.2
+          playwright install --with-deps msedge
           
       - name: Build EXE with PyInstaller
         run: |
