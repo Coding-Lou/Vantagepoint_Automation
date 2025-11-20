@@ -45,7 +45,7 @@ jobs:
           
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium main.py main.py 
+          pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium --exclude-module numpy main.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
