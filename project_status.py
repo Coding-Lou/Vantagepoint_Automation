@@ -4,7 +4,8 @@ import re
 import os
 from datetime import date
 from pathlib import Path
-import openpyxl
+from openpyxl import Workbook
+from openpyxl import load_workbook
 import local_log
 
 global HEADERS
@@ -20,7 +21,7 @@ CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 def init_output():
     if Path(output_file).exists():
         os.remove(output_file)
-    wb = openpyxl.Workbook()
+    wb = Workbook()
     wb.save(output_file)
 
 def print_period():
@@ -276,7 +277,7 @@ def download_labor_hours():
         CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def delete_default_sheet():
-    wb = openpyxl.load_workbook(output_file)
+    wb = load_workbook(output_file)
     ws = wb["Sheet"]
     wb.remove(ws)
     wb.save(output_file)
