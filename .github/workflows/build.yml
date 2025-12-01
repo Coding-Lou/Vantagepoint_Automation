@@ -41,11 +41,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-          playwright install --with-deps msedge
-          
+          pip install jinja2
+          playwright install chromium
+
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium main.py
+          pyinstaller main.py ^
+            --name start ^
+            --onefile ^
+            --console ^
+            --collect-all playwright ^
+            --hidden-import jinja2 ^
+            --hidden-import jinja2.ext ^
+            --collect-all certifi ^
+            --distpath dist
+
+      - name: Upload artifact (Debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: start-debug
+          path: dist/start.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -53,8 +68,9 @@ jobs:
           tag_name: "v_${{ env.VERSION }}"
           name: "Release v_${{ env.VERSION }}"
           body: |
-            ✅ Auto Release Build
+            🎉 Auto Release Build
             📅 Version: v_${{ env.VERSION }}
+            🔧 Includes Chromium & jinja2 Fixes
           files: dist/start.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
