@@ -6,7 +6,6 @@ import requests
 import os
 import sys
 import project_status
-from openpyxl import load_workbook
 import ap
 import ar
 import bridge_report
