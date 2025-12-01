@@ -427,7 +427,7 @@ def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent
     global RECORDS
     RECORDS += 1
 
-def ar_main():
+def main():
     ar_init()
     init_output()
     ar_download_csv()
@@ -439,4 +439,4 @@ def ar_main():
     util.save_excel(wb, RECORDS)
 
 if __name__ == "__main__":
-    ar_main()
+    main()

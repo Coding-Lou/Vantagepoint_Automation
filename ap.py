@@ -162,7 +162,7 @@ def ap_download_remittance(payment):
         CONSOLE_OUTPUT.tqdm_write("Error in download remittence")
 
 
-def ap_main():
+def main():
     util.check_folder("ap_export")
     init_output()
     ap_setup_time()
@@ -171,4 +171,4 @@ def ap_main():
     util.save_excel(wb, RECORDS)
 
 if __name__ == '__main__':
-    ap_main()
+    main()
