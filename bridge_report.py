@@ -409,6 +409,7 @@ def labour_merge_labour_details():
 
 def main():
     util.check_folder("bridge_report")
+    util.check_folder("bridge_report/output")
     util.clear_folder("bridge_report")
     download_invoice_register_ytd()
     projectList = set()

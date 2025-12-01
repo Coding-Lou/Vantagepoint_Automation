@@ -23,6 +23,15 @@ def init_output():
     wb = openpyxl.Workbook()
     wb.save(output_file)
 
+def print_period():
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/?meta=access"
+    response = requests.get(url, headers=HEADERS)
+    data = response.json()[:5]
+    for p in data:
+        print(f"{p["Period"]} | From: {p["AccountPdStart"][:10]} To: {p["AccountPdEnd"][:10]}")
+    
+    print("----------------------------")
+
 def download_invoices():
     try:
         # Step 1: Build
@@ -274,6 +283,9 @@ def delete_default_sheet():
 
 def main():
     global searchOptions
+    print_period()
+    period = input("Please input the period (202607): ")
+
     userInput = input("Project Name(s) (use commas to separate multiple entries): " )
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
@@ -282,9 +294,9 @@ def main():
         return
     
     searchOptions = util.assamble_projects(projects)
-    period = input("Please input the period (202607): ")
-    #util.set_period(period)
+    util.change_period(period)
     util.check_folder("project status")
+    util.clear_folder("project status")
     init_output()
     download_invoices()
     download_earnings()
