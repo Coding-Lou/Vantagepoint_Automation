@@ -45,7 +45,7 @@ jobs:
           
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller --onefile --clean --name start --console --collect-all playwright --hidden-import=project_status --hidden-import jinja2 --hidden-import jinja2.ext --collect-all certifi --distpath dist --exclude-module playwright._driver.chromium --paths . main.py
+          pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium --path . --hidden-import project_status main.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
