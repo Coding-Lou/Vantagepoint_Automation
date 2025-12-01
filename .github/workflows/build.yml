@@ -46,15 +46,7 @@ jobs:
 
       - name: Build EXE with PyInstaller
         run: |
-          pyinstaller main.py ^
-            --name start ^
-            --onefile ^
-            --console ^
-            --collect-all playwright ^
-            --hidden-import jinja2 ^
-            --hidden-import jinja2.ext ^
-            --collect-all certifi ^
-            --distpath dist
+          pyinstaller main.py --name start --onefile --console --collect-all playwright --hidden-import jinja2 --hidden-import jinja2.ext --collect-all certifi --distpath dist
 
       - name: Upload artifact (Debug)
         uses: actions/upload-artifact@v4
