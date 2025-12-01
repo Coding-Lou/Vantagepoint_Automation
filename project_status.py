@@ -285,7 +285,8 @@ def main():
     global searchOptions
     print_period()
     period = input("Please input the period (202607): ")
-
+    util.change_period(period)
+    
     userInput = input("Project Name(s) (use commas to separate multiple entries): " )
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
@@ -294,7 +295,7 @@ def main():
         return
     
     searchOptions = util.assamble_projects(projects)
-    util.change_period(period)
+    
     util.check_folder("project status")
     util.clear_folder("project status")
     init_output()
