@@ -45,6 +45,7 @@ jobs:
           
       - name: Build EXE with PyInstaller
         run: |
+          pyinstaller main.py --onefile --clean --hidden-import=project_status
           pyinstaller --onefile --name start --distpath dist --exclude-module playwright._driver.chromium main.py
 
       - name: Create Release
