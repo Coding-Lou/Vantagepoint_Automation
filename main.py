@@ -45,6 +45,12 @@ def check_update():
         return
 
 def main():
+    print("Checking if the program is latest version ...")
+    check_update()
+    util.show_welcome_banner()
+    util.init_workdir()
+
+    start_time = time.perf_counter()
     LOGIN = util.check_login()
 
     MENU = """
@@ -93,21 +99,17 @@ def main():
                 util.merge_pdfs()
         else:
             print("Invalid option. Please try again.")
-
-        print("\n" + "-" * 55 + "\n")
+            
+        end_time = time.perf_counter()
+        total_seconds = end_time - start_time
+        minutes, seconds = divmod(int(total_seconds), 60)
         print()
+        print(f"Total execution time {minutes} minutes, {seconds} seconds")
+        print("\n" + "-" * 55 + "\n")
+        
+     
 
 if __name__=="__main__":
-    print("Checking if the program is latest version ...")
-    check_update()
-    util.show_welcome_banner()
-    util.init_workdir()
-    start_time = time.perf_counter()
     main()
-    end_time = time.perf_counter()
-    total_seconds = end_time - start_time
-    minutes, seconds = divmod(int(total_seconds), 60)
-    print(f"Total execution time {minutes} minutes, {seconds} seconds")
-    print()
     print("🎉Done, Have a good day.")
-    input()
+    input()   
