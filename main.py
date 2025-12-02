@@ -6,9 +6,9 @@ import requests
 import os
 import sys
 import project_status
-from openpyxl import load_workbook
 import ap
 import ar
+import bridge_report
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
 EXE_NAME = "start.exe" 
@@ -45,6 +45,12 @@ def check_update():
         return
 
 def main():
+    print("Checking if the program is latest version ...")
+    check_update()
+    util.show_welcome_banner()
+    util.init_workdir()
+
+    start_time = time.perf_counter()
     LOGIN = util.check_login()
 
     MENU = """
@@ -53,8 +59,9 @@ def main():
 ======================================================
   1) AP - Remittance
   2) AR - Statements
-  3) Report Preparation - Project Status Report
-  4) Merge PDF
+  3) Report Preparation - Project Status
+  4) Report Preparation - Bridge Report
+  5) Merge PDF
 
   0) Exit
 ======================================================
@@ -69,7 +76,7 @@ def main():
             return
 
         # Actions that require login
-        login_required_actions = {"1", "2", "3", "6"}
+        login_required_actions = {"1", "2", "3", "4"}
         if userInput in login_required_actions and not LOGIN:
             while not LOGIN :
                 login.sso_login()
@@ -77,41 +84,32 @@ def main():
 
         # Handle menu selection
         if userInput == "1":
-            ap.ap_main()
-
+            ap.main()
         elif userInput == "2":
-            ar.ar_main()
-
+            ar.main()
         elif userInput == "3":
             project_status.main()
-
         elif userInput == "4":
+            bridge_report.main()
+        elif userInput == "5":
             option = input("Merge Amazon invoices? (Y/N): ").strip().upper()
             if option.startswith("Y"):
                 util.merge_amazon_invoices()
             else:
                 util.merge_pdfs()
-
-        # elif userInput == "6":
-        #     labour_process()
-
         else:
             print("Invalid option. Please try again.")
-
-        print("\n" + "-" * 55 + "\n")
+            
+        end_time = time.perf_counter()
+        total_seconds = end_time - start_time
+        minutes, seconds = divmod(int(total_seconds), 60)
         print()
+        print(f"Total execution time {minutes} minutes, {seconds} seconds")
+        print("\n" + "-" * 55 + "\n")
+        
+     
 
 if __name__=="__main__":
-    print("Checking if the program is latest version ...")
-    check_update()
-    util.show_welcome_banner()
-    util.init_workdir()
-    start_time = time.perf_counter()
     main()
-    end_time = time.perf_counter()
-    total_seconds = end_time - start_time
-    minutes, seconds = divmod(int(total_seconds), 60)
-    print(f"Total execution time {minutes} minutes, {seconds} seconds")
-    print()
     print("🎉Done, Have a good day.")
-    input()
+    input()   

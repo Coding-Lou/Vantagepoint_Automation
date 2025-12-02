@@ -7,30 +7,29 @@ import local_log
 import re
 import os
 
-def init_global():
-    global HEADERS
-    HEADERS = util.set_headers()
-    # Email
-    global EXCLUDE
-    EXCLUDE = util.get_config(["AP", "EXCLUDE"])
-    global MAIL_FROM
-    MAIL_FROM = util.get_config(["AP", "FROM"])
-    global CC
-    CC = util.get_config(["AP", "CC"])
-    global SUBJECT
-    SUBJECT = util.get_config(["AP", "SUBJECT"])
-    global BODY
-    BODY = util.get_config(["AP", "BODY"])
-    # Output location
-    global ONEDRIVEDIR
-    ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
-    global WORKDIR
-    WORKDIR = util.get_config(['WORKDIR'])
-    # Log Conifg
-    global CONSOLE_OUTPUT
-    CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
-    global RECORDS
-    RECORDS = 1
+global HEADERS
+HEADERS = util.set_headers()
+# Email
+global EXCLUDE
+EXCLUDE = util.get_config(["AP", "EXCLUDE"])
+global MAIL_FROM
+MAIL_FROM = util.get_config(["AP", "FROM"])
+global CC
+CC = util.get_config(["AP", "CC"])
+global SUBJECT
+SUBJECT = util.get_config(["AP", "SUBJECT"])
+global BODY
+BODY = util.get_config(["AP", "BODY"])
+# Output location
+global ONEDRIVEDIR
+ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
+global WORKDIR
+WORKDIR = util.get_config(['WORKDIR'])
+# Log Conifg
+global CONSOLE_OUTPUT
+CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+global RECORDS
+RECORDS = 1
 
 def init_output():
     global wb
@@ -163,14 +162,13 @@ def ap_download_remittance(payment):
         CONSOLE_OUTPUT.tqdm_write("Error in download remittence")
 
 
-def ap_main():
+def main():
     util.check_folder("ap_export")
     init_output()
-    init_global()
     ap_setup_time()
     paymentsData = ap_get_remittance()
     ap_process_remittance(paymentsData)
     util.save_excel(wb, RECORDS)
 
 if __name__ == '__main__':
-    ap_main()
+    main()

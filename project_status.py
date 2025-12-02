@@ -4,26 +4,34 @@ import re
 import os
 from datetime import date
 from pathlib import Path
-import openpyxl
+from openpyxl import Workbook
+from openpyxl import load_workbook
 import local_log
 
-def init_global():
-    global HEADERS
-    HEADERS = util.set_headers()
-    global searchOptions
-    searchOptions = None
-    global output_file
-    output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
-
-    # Log Conifg
-    global CONSOLE_OUTPUT
-    CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+global HEADERS
+HEADERS = util.set_headers()
+global searchOptions
+searchOptions = None
+global output_file
+output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
+# Log Conifg
+global CONSOLE_OUTPUT
+CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def init_output():
     if Path(output_file).exists():
         os.remove(output_file)
-    wb = openpyxl.Workbook()
+    wb = Workbook()
     wb.save(output_file)
+
+def print_period():
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/?meta=access"
+    response = requests.get(url, headers=HEADERS)
+    data = response.json()[:5]
+    for p in data:
+        print(f"{p["Period"]} | From: {p["AccountPdStart"][:10]} To: {p["AccountPdEnd"][:10]}")
+    
+    print("----------------------------")
 
 def download_invoices():
     try:
@@ -269,14 +277,17 @@ def download_labor_hours():
         CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to copy the data to output file:", e)
 
 def delete_default_sheet():
-    wb = openpyxl.load_workbook(output_file)
+    wb = load_workbook(output_file)
     ws = wb["Sheet"]
     wb.remove(ws)
     wb.save(output_file)
 
 def main():
-    init_global()
     global searchOptions
+    print_period()
+    period = input("Please input the period (202607): ")
+    util.change_period(period)
+    
     userInput = input("Project Name(s) (use commas to separate multiple entries): " )
     projects = [p.strip() for p in userInput.split(",") if p.strip()]
 
@@ -285,9 +296,9 @@ def main():
         return
     
     searchOptions = util.assamble_projects(projects)
-    #period = input("Please input the period (202607): ")
-    #set_period(period)
+    
     util.check_folder("project status")
+    util.clear_folder("project status")
     init_output()
     download_invoices()
     download_earnings()
@@ -298,3 +309,5 @@ def main():
 
     CONSOLE_OUTPUT.tqdm_write(f'The output file is: output_{date.today().strftime("%Y-%m-%d")}.xlsx')
 
+if __name__ == '__main__':
+    main()

@@ -77,6 +77,9 @@ def check_login():
         else: 
             return False
     except:
+        set_config("TOKEN", "")
+        set_config("WWWBEARER", "")
+        set_config("COOKIES", "")
         CONSOLE_OUTPUT.tqdm_write("❌ Error in function check_login()")
         return False
 
@@ -304,3 +307,6 @@ def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
         df.to_excel(writer, sheet_name=sheet_name, index=False)
 
     CONSOLE_OUTPUT.tqdm_write(f"Copied to the {output_file} / {sheet_name}")
+
+if __name__ == "__main__":
+    print()
