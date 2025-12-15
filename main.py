@@ -9,6 +9,7 @@ import project_status
 import ap
 import ar
 import bridge_report
+import shipping_monitor
 
 GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
 EXE_NAME = "start.exe" 
@@ -61,7 +62,8 @@ def main():
   2) AR - Statements
   3) Report Preparation - Project Status
   4) Report Preparation - Bridge Report
-  5) Merge PDF
+  5) Shipping Monitor
+  6) Merge PDF
 
   0) Exit
 ======================================================
@@ -76,7 +78,7 @@ def main():
             return
 
         # Actions that require login
-        login_required_actions = {"1", "2", "3", "4"}
+        login_required_actions = {"1", "2", "3", "4", "5"}
         if userInput in login_required_actions and not LOGIN:
             while not LOGIN :
                 login.sso_login()
@@ -92,6 +94,8 @@ def main():
         elif userInput == "4":
             bridge_report.main()
         elif userInput == "5":
+            shipping_monitor.main()
+        elif userInput == "6":
             option = input("Merge Amazon invoices? (Y/N): ").strip().upper()
             if option.startswith("Y"):
                 util.merge_amazon_invoices()
@@ -107,8 +111,6 @@ def main():
         print(f"Total execution time {minutes} minutes, {seconds} seconds")
         print("\n" + "-" * 55 + "\n")
         
-     
-
 if __name__=="__main__":
     main()
     print("🎉Done, Have a good day.")

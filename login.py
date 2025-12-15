@@ -64,31 +64,34 @@ def set_asp_net_cookie():
     global TOKEN
     global COOKIES
     global WWWBEARER
-    # Build
-    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
-    headers = util.set_headers()
-    payload = {"reportPath":"/Standard/AccountingGeneral/Remittance Advice","reportOptions":{"BankCode":"RBC-CDN","period":202607,"PostSeq":22,"ShowSSN":"N","checkpayee":"2","vendor":"UPSCAN","Employee":"","CheckNo":"'700000278'"}}
-    response = requests.post(url, headers=headers, json=payload)
-    data = response.json()
-    report_path_raw = data["return"]["ReportPath"]
-    report_path = report_path_raw.replace(" ", "%20")
+    try:
+        # Build
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
+        headers = util.set_headers()
+        payload = {"reportPath":"/Standard/AccountingGeneral/Remittance Advice","reportOptions":{"BankCode":"RBC-CDN","period":202607,"PostSeq":22,"ShowSSN":"N","checkpayee":"2","vendor":"UPSCAN","Employee":"","CheckNo":"'700000278'"}}
+        response = requests.post(url, headers=headers, json=payload)
+        data = response.json()
+        report_path_raw = data["return"]["ReportPath"]
+        report_path = report_path_raw.replace(" ", "%20")
 
-    # Get Nonce
-    url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
-    payload = {}
-    response = requests.post(url, headers=headers, json=payload)
-    nonce = response.json()
+        # Get Nonce
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+        payload = {}
+        response = requests.post(url, headers=headers, json=payload)
+        nonce = response.json()
 
-    # Get Viewer
-    url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Remittance%20Advice"
-    response = requests.get(url, headers=headers)
+        # Get Viewer
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Remittance%20Advice"
+        response = requests.get(url, headers=headers)
 
-    asp_net_cookie = response.headers.get("Set-Cookie").split(";", 1)[0]
-    COOKIES = COOKIES + ";" + asp_net_cookie
+        asp_net_cookie = response.headers.get("Set-Cookie").split(";", 1)[0]
+        COOKIES = COOKIES + ";" + asp_net_cookie
 
-    #print(f"ASP_NET Cookie: " + asp_net_cookie)
-    #print(f"Current Cookies: {COOKIES}")
-    util.set_config("COOKIES", COOKIES)
+        #print(f"ASP_NET Cookie: " + asp_net_cookie)
+        #print(f"Current Cookies: {COOKIES}")
+        util.set_config("COOKIES", COOKIES)
+    except Exception as e:
+        print(f"❌ Login Failed, error in set the asp_net cookie. {e}")
  
 def sso_login():
     global USER_BROWSER_DIR
@@ -102,6 +105,8 @@ def sso_login():
         page = context.new_page()
         page.on("request", set_token_cookies)
         page.goto("https://qcadeltek03.qcasystems.com/Vantagepoint/app")
+        login_btn = page.locator("#loginBtn")
+        login_btn.click()
         time.sleep(5)
         context.close()
 
