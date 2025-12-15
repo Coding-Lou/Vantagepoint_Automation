@@ -308,5 +308,23 @@ def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
 
     CONSOLE_OUTPUT.tqdm_write(f"Copied to the {output_file} / {sheet_name}")
 
-if __name__ == "__main__":
-    print()
+def findLastPO():
+    HEADERS = set_headers()
+    def checkPOExist(po):
+        try:
+            url = f"https://qcadeltek03.qcasystems.com/vantagepoint/vision/PurchaseOrder/POMaster/?searchType=ALL&filter={po}&page=1&pagesize=100&order=name"
+            response = requests.get(url, headers=HEADERS )
+            data = response.json()
+            return len(data) > 0
+        except Exception as e:
+            print(f"Function: checkPoExist of {po} had error {e}")
+
+    left = 20000
+    right = 100000
+    while (left < right-1):
+        mid = int(left + (right - left) / 2)
+        if (checkPOExist(mid)):
+            left = mid
+        else:
+            right = mid - 1
+    return left

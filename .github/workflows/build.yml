@@ -2,8 +2,8 @@ name: Build and Release EXE
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["dev"]
+#  push:
+#    branches: ["dev"]
 
 permissions:
   contents: write
