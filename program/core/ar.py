@@ -1,10 +1,8 @@
-import util
-import local_log
+import tools.util as util
 import requests
 import re
 import os
 import csv
-from tqdm import tqdm
 from openpyxl import Workbook
 from datetime import datetime
 import zipfile
@@ -27,9 +25,9 @@ global ONEDRIVEDIR
 ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
 global WORKDIR
 WORKDIR = util.get_config(['WORKDIR'])
+global EXCLUDE
+EXCLUDE = util.get_config(['AR','EXCLUDE'])
 # Log Conifg
-global CONSOLE_OUTPUT
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 global RECORDS
 RECORDS = 1
 global STATEMENTDATE
@@ -43,6 +41,10 @@ def ar_init():
     util.clear_folder("ar_export")
     global STATEMENTDATE
     STATEMENTDATE = input("Statement Date (format 2025-05-01): ")
+    # User Setting
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/UserSettings"
+    payload = {"FW_SEUserOptions":[{"OptionName":"arReviewPaidStatus","OptionValue":"Unpaid","_transType":"U"}]}
+    requests.post(url, headers=HEADERS, json=payload )
 
 def init_output():
     global wb
@@ -50,7 +52,6 @@ def init_output():
     ws = wb.active
     ws.title = "Sheet1"
     ws.append(["ClientID","From","To","CC","Subject","AttachmentName","AttachmentContent","Body", "ClientName"])
-
 
 def ar_download_csv():
     try:
@@ -77,7 +78,7 @@ def ar_download_csv():
 
         report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
         control_id     = re.search(r"ControlID=([A-Za-z0-9]+)", html)
-        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+        session_token = re.search(r'_token="([^"]+)"', html)
 
         # Step 4: SessionKeepALive
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/Reporting/Reserved.ReportViewerWebControl.axd?OpType=SessionKeepAlive&ControlID="+control_id.group(1)+"&RSProxy=https%3a%2f%2fqcadeltek03.qcasystems.com%2fReportServer"
@@ -107,13 +108,18 @@ def ar_download_csv():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            CONSOLE_OUTPUT.tqdm_write("✅ Full statements lists get")
-            CONSOLE_OUTPUT.tqdm_write("")
+            print("✅ Full statements lists get")
         else:
-            CONSOLE_OUTPUT.tqdm_write(f"❌ Error, status code: {response.status_code}")
-            CONSOLE_OUTPUT.tqdm_write("Msg:", response.content[:500])
+            print(f"❌ Error, status code: {response.status_code}")
+            print("Msg:", response.content[:500])
+
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/app/base/MakeVisionServiceRequest?method=DeleteAndStopReport"
+        payload = {"sessionID": session_token.group(1), "reportPath": report_path_raw}
+        response = requests.post(url, headers=HEADERS, json=payload )
+        
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in download the full AR statement list ")
+        print("❌ Error in download the full AR statement list ")
+
 
 def ar_process():
     clientNames = set()
@@ -126,23 +132,23 @@ def ar_process():
                 if value:
                     clientNames.add(value)
     zipClientName = []
-    for i,clientName in enumerate(tqdm(clientNames, desc="Processing progress: ", unit="clientName") , start=1):
+    for i, clientName in enumerate(clientNames, start=1):
         global DUEINVOICE
         DUEINVOICE = ""
         if (not "QCA Systems Ltd." in clientName):
-            CONSOLE_OUTPUT.tqdm_write("-----" + clientName + "-----")
+            print("-----" + clientName + "-----")
             clientID = util.get_clientID(clientName)
             data = ar_review(clientID)
             email = util.get_vendor_email(clientID)
             if email != '': 
-                CONSOLE_OUTPUT.tqdm_write("✅ Vendor email: " + email)
+                print("✅ Vendor email: " + email)
             else:
-                CONSOLE_OUTPUT.tqdm_write("❌ " + clientName + " mail not found")
+                print("❌ " + clientName + " mail not found")
             fileName = ar_download_statement_pdf(clientID, clientName)
             if fileName != '': 
-                CONSOLE_OUTPUT.tqdm_write("✅ Vendor's statement download")
+                print("✅ Vendor's statement download")
             else:
-                CONSOLE_OUTPUT.tqdm_write("❌ Error")
+                print("❌ Error")
             pmList = ""
             if ( (data['Age2'] != "" and int(data['Age2']) > 0) or 
                 (data['Age3'] != "" and int(data['Age3']) > 0) or 
@@ -157,15 +163,15 @@ def ar_process():
             ar_details(clientID)
             if ar_need_zip(clientID, clientName):
                 zipClientName.append(clientName)
-            CONSOLE_OUTPUT.tqdm_write(f"{'Client':<30} {'0-30':>12} {'31-45':>12} {'46-60':>12} {'61-90':>12} {'90+':>12}")
-            CONSOLE_OUTPUT.tqdm_write("----------------------------------------------------------------------------------------------------------------")
-            CONSOLE_OUTPUT.tqdm_write(f"{clientName[:30]:<30} "
+            print(f"{'Client':<30} {'0-30':>12} {'31-45':>12} {'46-60':>12} {'61-90':>12} {'90+':>12}")
+            print("----------------------------------------------------------------------------------------------------------------")
+            print(f"{clientName[:30]:<30} "
                   f"${data['Age1']:>12,.2f} "
                   f"${data['Age2']:>12,.2f} "
                   f"${data['Age3']:>12,.2f} "
                   f"${data['Age4']:>12,.2f} "
                   f"${data['Age5']:>12,.2f} ")
-            CONSOLE_OUTPUT.tqdm_write("")
+            print("")
     return zipClientName
 
 def ar_review(clientID):
@@ -175,17 +181,17 @@ def ar_review(clientID):
         data = response.json()
         return data[0]
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in get full invoice of vendor " + clientID)
+        print("❌ Error in get full invoice of vendor " + clientID)
 
 def ar_details(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
     records = response.json()
     for r in records:
-        if r['Total'] <= 0:
+        if r['Total'] <= 0 or clientID in EXCLUDE:
             continue
         ar_download_proj_invoice_pdf(r['WBS1'], clientID)
-        CONSOLE_OUTPUT.tqdm_write('✅ ' + r['WBS1'] + " invoice download")
+        print('✅ ' + r['WBS1'] + " invoice download")
 
 def ar_download_statement_pdf(clientID, clientName):
     try:
@@ -213,7 +219,7 @@ def ar_download_statement_pdf(clientID, clientName):
 
         report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
         control_id     = re.search(r"ControlID=([A-Za-z0-9]+)", html)
-        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+        session_token = re.search(r'_token="([^"]+)"', html)
 
         fileName = "Statement of account - " + clientName + " as of " + STATEMENTDATE + ".pdf"
 
@@ -239,9 +245,26 @@ def ar_download_statement_pdf(clientID, clientName):
                     if chunk:
                         f.write(chunk)
             return fileName
+        
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/app/base/MakeVisionServiceRequest?method=DeleteAndStopReport"
+        payload = {"sessionID": session_token.group(1), "reportPath": report_path_raw}
+        response = requests.post(url, headers=HEADERS, json=payload )
+
         return ""
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in download statement of " + clientName)
+        print("❌ Error in download statement of " + clientName)
+
+def ar_billing_term(projectId):
+    projectIdClear = util.cleanup_projectID(projectId)
+    url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/BillingTermsBO/{projectIdClear}?meta=channel%2Caccess"
+    response = requests.get(url, headers = HEADERS)
+    data = response.json()
+    return int(data[0].get('DaysBeforeDue') or 30)
+
+def ar_check_due(invoice):
+    projectId = invoice['InvoiceMainWBS1']
+    daysBeforeDue = ar_billing_term(projectId)
+    return daysBeforeDue < int(invoice['DaysOut'])
 
 def ar_generate_invoices_table(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
@@ -249,34 +272,48 @@ def ar_generate_invoices_table(clientID):
     records = response.json()
     message = ""
     global DUEINVOICE
+    AGE_FIELDS = ["Age1", "Age2", "Age3", "Age4", "Age5"]
+
     for r in records:
         if r['Total'] <= 0:
             continue
         projectID = r['WBS1']
-        projectID = projectID.replace("/","[_$2F_]")
+        projectID = util.cleanup_projectID(projectID)
+
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ projectID +"/"+ clientID +"/ARReviewDetail"
         response = requests.get(url, headers=HEADERS)
         invoices = response.json()
+        rows = []
+        due_invoices = []
         for invoice in invoices:
-            if invoice.get("Age1", 0) > 0 or invoice.get("Age2", 0) > 0 or invoice.get("Age3", 0) > 0 or invoice.get("Age4", 0) > 0 or invoice.get("Age5", 0) > 0:
-                message += (
-                    f"<tr>"
-                    f'<td align="center">{invoice.get("InvoiceNumber", "")}</td>'
-                    f'<td align="right" style="text-align: right;">{format_amount(invoice.get("Age1", 0))}</td>'
-                    f'<td align="right" style="text-align: right; color:red;">{format_amount(invoice.get("Age2", 0))}</td>'
-                    f'<td align="right" style="text-align: right; color:red;">{format_amount(invoice.get("Age3", 0))}</td>'
-                    f'<td align="right" style="text-align: right; color:red;">{format_amount(invoice.get("Age4", 0))}</td>'
-                    f'<td align="right" style="text-align: right; color:red;">{format_amount(invoice.get("Age5", 0))}</td>'
-                    f'</tr>'
-                )
-                if invoice.get("Age2", 0) > 0 or invoice.get("Age3", 0) > 0 or invoice.get("Age4", 0) > 0 or invoice.get("Age5", 0) > 0:
-                    DUEINVOICE += invoice.get("InvoiceNumber", "") + ", "
+            due = ar_check_due(invoice)
+            aging_amounts = {field: invoice.get(field, 0) for field in AGE_FIELDS}
+
+            if not any(amount > 0 for amount in aging_amounts.values()):
+                continue
+
+            if due:
+                due_invoices.append(invoice.get("InvoiceNumber", ""))
+            
+            color = "red" if due else "inherit"
+
+            row = [f'<tr><td align="center">{invoice.get("InvoiceNumber", "")}</td>']
+
+            for amount in aging_amounts.values():
+                row.append(f'<td align="right" style="color:{color};">{format_amount(amount)}</td>')
+            row.append('</tr>')
+            rows.append("".join(row))
+
+        message += "".join(rows)
+        if due:
+            DUEINVOICE += invoice.get("InvoiceNumber", "") + ", "
 
     return message
 
 def ar_download_proj_invoice_pdf(projectID, clientId):
-    projectID = projectID.replace("/","[_$2F_]")
-    url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ projectID +"/"+ clientId +"/ARReviewDetail"
+    projectIDConverted = util.cleanup_projectID(projectID)
+    projectName = util.cleanup_projectName(projectID)
+    url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ projectIDConverted +"/"+ clientId +"/ARReviewDetail"
     response = requests.get(url, headers=HEADERS)
     invoices = response.json()
     for invoice in invoices: 
@@ -285,10 +322,10 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
         clientName = invoice['ClientName']
         clientName = clientName.replace("/"," ")
         try:
-            url = "https://qcadeltek03.qcasystems.com/vantagepoint/app/Invoices/GetInvoiceFileInfo?invoiceMainWBS1="+invoice['InvoiceMainWBS1']+"&wbs1="+ projectID.replace("[_$2F_]","%2F") +"&invoiceNumber="+ invoice['InvoiceNumber'] +"&creditMemoRefno=&linkCompany="
+            url = "https://qcadeltek03.qcasystems.com/vantagepoint/app/Invoices/GetInvoiceFileInfo?invoiceMainWBS1="+invoice['InvoiceMainWBS1']+"&wbs1="+ projectName +"&invoiceNumber="+ invoice['InvoiceNumber'] +"&creditMemoRefno=&linkCompany="
             response = requests.get(url, headers=HEADERS)
 
-            url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/InteractiveDetail/" + projectID + "/InvoiceHistory/"+ invoice['InvoiceNumber'] +"/print?printBackupReport=Y&printSupportDocuments=N&DownloadInvoice=N&creditMemo=&hasDraftInvoice=&applicationId=ARReview"
+            url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/InteractiveDetail/" + projectIDConverted + "/InvoiceHistory/"+ invoice['InvoiceNumber'] +"/print?printBackupReport=Y&printSupportDocuments=N&DownloadInvoice=N&creditMemo=&hasDraftInvoice=&applicationId=ARReview"
             response = requests.get(url, headers=HEADERS)
 
             if response.headers.get('Content-Type') == 'application/pdf' and response.content.startswith(b'%PDF'):
@@ -312,7 +349,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
             nonce = response.json()
 
              # Step 4: Get Viewer
-            url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx??&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Invoice&embedded=Y&runtimeParameters%5B0%5D%5BshowBillingBackup%5D=1&runtimeParameters%5B1%5D%5BPreInvoice%5D=N&runtimeParameters%5B2%5D%5BHeaderInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B3%5D%5BMainWBS1%5D="+projectID.replace("[_$2F_]","%2F")+"&runtimeParameters%5B4%5D%5BmainWBS1Name%5D=&runtimeParameters%5B5%5D%5BInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B6%5D%5BActivePeriod%5D="
+            url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx??&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Invoice&embedded=Y&runtimeParameters%5B0%5D%5BshowBillingBackup%5D=1&runtimeParameters%5B1%5D%5BPreInvoice%5D=N&runtimeParameters%5B2%5D%5BHeaderInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B3%5D%5BMainWBS1%5D="+projectName+"&runtimeParameters%5B4%5D%5BmainWBS1Name%5D=&runtimeParameters%5B5%5D%5BInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B6%5D%5BActivePeriod%5D="
 
             response = requests.post(url, headers=HEADERS)
 
@@ -320,7 +357,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
 
             report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
             control_id     = re.search(r"ControlID=([A-Za-z0-9]+)", html)
-            sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+            session_token = re.search(r'_token="([^"]+)"', html)
 
             fileName = invoice['InvoiceNumber'] + "_" + clientName + ".pdf"
 
@@ -346,8 +383,13 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
                         if chunk:
                             f.write(chunk)
                 ar_create_record(clientId, "", "", fileName,"", "")
+            
+            url = "https://qcadeltek03.qcasystems.com/Vantagepoint/app/base/MakeVisionServiceRequest?method=DeleteAndStopReport"
+            payload = {"sessionID": session_token.group(1), "reportPath": report_path_raw}
+            response = requests.post(url, headers=HEADERS, json=payload )
+            
         except Exception as e:
-            CONSOLE_OUTPUT.tqdm_write("❌ Error in download " + invoice['InvoiceNumber'] + " of " + clientName)
+            print("❌ Error in download " + invoice['InvoiceNumber'] + " of " + clientName)
             continue
 
 def ar_get_pm_list(clientID):
@@ -359,18 +401,17 @@ def ar_get_pm_list(clientID):
     for proj in projList:
         if proj['Age2'] > 0 or proj['Age3'] > 0 or proj['Age4'] > 0 or proj['Age5'] > 0:
             projName = proj['WBS1']
-            projName = projName.replace(" ", "%20")
-            projName = projName.replace("/", "%2F")
+            projName = util.cleanup_projectName(projName)
             url = "https://qcadeltek03.qcasystems.com/vantagepoint/app/project/GetProjectPlan?wbs1="+ projName +"&jtdSearch=N"
             response = requests.get(url, headers=HEADERS)
             data = response.json()
             if data['ProjMgrEmail'] != '': 
-                CONSOLE_OUTPUT.tqdm_write("✅ "+ proj['WBS1'] +" is due, PM email: " + data['ProjMgrEmail'])
+                print("✅ "+ proj['WBS1'] +" is due, PM email: " + data['ProjMgrEmail'])
                 if not data['ProjMgrEmail'] in list:
                     list.add(data['ProjMgrEmail'] )
                     pmList += data['ProjMgrEmail'] + ";"
             else:
-                CONSOLE_OUTPUT.tqdm_write("❌ " +  proj['WBS1'] + " PM email not found")        
+                print("❌ " +  proj['WBS1'] + " PM email not found")        
     return pmList
 
 def ar_need_zip(clientID, clientName):

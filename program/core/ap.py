@@ -1,9 +1,8 @@
 import sys
-import util
+import tools.util as util
 from openpyxl import Workbook
 import requests
 from tqdm import tqdm
-import local_log
 import re
 import os
 
@@ -25,9 +24,7 @@ global ONEDRIVEDIR
 ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
 global WORKDIR
 WORKDIR = util.get_config(['WORKDIR'])
-# Log Conifg
-global CONSOLE_OUTPUT
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+# Output workbook and sheet
 global RECORDS
 RECORDS = 1
 
@@ -55,28 +52,33 @@ def ap_get_remittance():
 
         paymentsData = response.json()
 
-        CONSOLE_OUTPUT.write("\nTotal Remittances Records (Includes voided) : " + str(len(paymentsData)))
-        CONSOLE_OUTPUT.write("-------------------------------------------")
+        print("\nTotal Remittances Records (Includes voided) : " + str(len(paymentsData)))
+        print("-------------------------------------------")
         return paymentsData
     
     except:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in function ap_get_remittance")
+        print("❌ Error in function ap_get_remittance")
 
 def ap_process_remittance(paymentsData):
     i = 0
-    for i, payment in enumerate(tqdm(paymentsData, desc="Processing Progress: ", unit="payment"), start=1):
-        i = i+1
-        if (not payment["ClientID"] in EXCLUDE and payment["VoidPostSeq"] == 0 and payment["BankCode"] != "1107"):
-            email = util.get_vendor_email(payment["ClientID"])
-            ap_download_remittance(payment)
-            ap_create_record(payment, email)
-        else:
-            if payment["ClientID"] in EXCLUDE:
-                CONSOLE_OUTPUT.tqdm_write(f"⚠️ {i} {payment['Payee']} is excluded")
-            if payment["BankCode"] == "1107":
-                CONSOLE_OUTPUT.tqdm_write(f"⚠️ {i} {payment['Payee']} This remittance is fX")
-            if payment["VoidPostSeq"] != 0:
-                CONSOLE_OUTPUT.tqdm_write(f"⚠️ {i} Payment Number: {payment['CheckNumber']} has been Voided")
+    for i, payment in enumerate(paymentsData, start=1):
+        try:
+            i = i+1
+            if (not payment["ClientID"] in EXCLUDE and payment["VoidPostSeq"] == 0 and payment["BankCode"] != "1107"):
+                email = util.get_vendor_email(payment["ClientID"])
+                ap_download_remittance(payment)
+                ap_create_record(payment, email)
+            else:
+                if payment["ClientID"] in EXCLUDE:
+                    print(f"⚠️ {i} {payment['Payee']} is excluded")
+                if payment["BankCode"] == "1107":
+                    print(f"⚠️ {i} {payment['Payee']} This remittance is fX")
+                if payment["VoidPostSeq"] != 0:
+                    print(f"⚠️ {i} Payment Number: {payment['CheckNumber']} has been Voided")
+        except Exception as e:
+            print(f"❌ Error processing payment Number: {payment['CheckNumber']}")
+            print(e)
+            continue
 
 def ap_create_record(payment, email):
     ws = wb.active
@@ -125,7 +127,7 @@ def ap_download_remittance(payment):
         html = response.text
         report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
         control_id = re.search(r"ControlID=([A-Za-z0-9]+)", html)
-        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+        session_token = re.search(r'_token="([^"]+)"', html)
 
         if not (report_session and control_id):
             raise RuntimeError("Error")
@@ -153,13 +155,17 @@ def ap_download_remittance(payment):
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            CONSOLE_OUTPUT.tqdm_write("✅ "+ fileName+" Downloaded")
+            print("✅ "+ fileName+" Downloaded")
         else:
-            CONSOLE_OUTPUT.tqdm_write(f"❌ Error, status code: {response.status_code}")
-            CONSOLE_OUTPUT.tqdm_write("Msg: ", response.content[:500])
+            print(f"❌ Error, status code: {response.status_code}")
+            print("Msg: ", response.content[:500])
+        
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/app/base/MakeVisionServiceRequest?method=DeleteAndStopReport"
+        payload = {"sessionID": session_token.group(1), "reportPath": report_path_raw}
+        response = requests.post(url, headers=HEADERS, json=payload )
 
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("Error in download remittence")
+        print("Error in download remittence")
 
 
 def main():
@@ -170,5 +176,3 @@ def main():
     ap_process_remittance(paymentsData)
     util.save_excel(wb, RECORDS)
 
-if __name__ == '__main__':
-    main()

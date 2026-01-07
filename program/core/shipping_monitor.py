@@ -1,17 +1,13 @@
-import util
+import tools.util as util
 import requests
 import os
 from datetime import datetime, date
 from openpyxl import Workbook
 from zoneinfo import ZoneInfo
-import local_log
-import packing_slip 
+import core.packing_slip as packing_slip
 
 global HEADERS
 HEADERS = util.set_headers()
-# Log Conifg
-global CONSOLE_OUTPUT
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def get_master_key(po):
     try:
