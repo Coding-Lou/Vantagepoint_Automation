@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-import util
+from tools import util
 import time, json
 import os
 import requests

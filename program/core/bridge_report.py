@@ -1,4 +1,4 @@
-import util
+import tools.util as util
 import requests
 import re
 import os
@@ -7,16 +7,12 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl import load_workbook
 import csv
-import local_log
 from collections import defaultdict
 
 global HEADERS
 HEADERS = util.set_headers()
 global searchOptions
 searchOptions = None
-# Log Conifg
-global CONSOLE_OUTPUT
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
 
 def format_amount(val):
     return f"{val:,.2f}" if val and val > 0 else ""
@@ -98,10 +94,10 @@ def download_invoice_register_ytd():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            CONSOLE_OUTPUT.tqdm_write("✅ "+ csvName+" Downloaded")
+            print("✅ "+ csvName+" Downloaded")
 
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("⚠️ Failed to download the invoices register")
+        print("⚠️ Failed to download the invoices register")
 
 def labour_download_labour_details(projectId):
     projectName = projectId.replace("/", "_")
@@ -348,8 +344,8 @@ def labour_invoice_match(project):
     
     ws.cell(row=1, column=col_map['Comment']+1).value = "invoice"
     transactionFileName = "Labour_Details_With_Invoices " + projectName + ".xlsx"
-    CONSOLE_OUTPUT.tqdm_write(f"✅ {projectName} timesheet invoice match finished")
-    CONSOLE_OUTPUT.tqdm_write(f"---------------------------------")
+    print(f"✅ {projectName} timesheet invoice match finished")
+    print(f"---------------------------------")
     wb.save( os.path.join("bridge_report", transactionFileName))
 
 def labour_merge_transaction_details():

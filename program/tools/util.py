@@ -6,10 +6,9 @@ import requests
 from openpyxl.worksheet.table import Table
 from datetime import datetime
 import pandas as pd
-import local_log
+import subprocess
 import glob
-
-CONSOLE_OUTPUT = local_log.DualOutput("runtime_log.txt")
+import sys
 
 def show_welcome_banner():
     banner = rf"""
@@ -25,43 +24,74 @@ def show_welcome_banner():
     ──────────────────────────────────────────────────────────
     """
 
-    CONSOLE_OUTPUT.tqdm_write(banner)
-    CONSOLE_OUTPUT.tqdm_write("🚀 Welcome! \n")
+    print(banner)
+    print("🚀 Welcome! \n")
+
+def show_menu():
+    MENU = """
+======================================================
+                   MAIN MENU
+======================================================
+  1) AP - Remittance
+  2) AR - Statements
+  3) Report Preparation - Project Status
+  4) Report Preparation - Bridge Report
+  5) Shipping Monitor
+  6) Daily Receiving Notification
+  7) Merge PDF
+
+  0) Exit
+======================================================
+"""
+    print(MENU)
+
+def get_runtime_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
 
 def get_config(klist):
+    base_dir = get_runtime_dir()
+    config_path = (base_dir / "config.json"
+        if (base_dir / "config.json").exists()
+        else base_dir.parent / "config" / "config.json")
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         node = config
         for key in klist:
-            if key not in node:
+            if key not in node: 
                 node[key] = ""
             node = node[key]
 
-        with open("config.json", "w", encoding="utf-8") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
             
         return node
     
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write(f"⚠️ Get config failed")
+        print(f"⚠️ Get config failed")
         return None
 
 def set_config(key, value):
+    base_dir = get_runtime_dir()
+    config_path = (base_dir / "config.json"
+        if (base_dir / "config.json").exists()
+        else base_dir.parent / "config" / "config.json")
     try:
-        with open("config.json", "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         
         config[key] = value
-        
-        with open("config.json", "w", encoding="utf-8") as f:
+
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
             f.flush()
 
-        CONSOLE_OUTPUT.tqdm_write(f"💾 {key} been updated to {value}. ")
+        print(f"💾 {key} been updated to {value}. ")
 
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write(f"⚠️ {key} updated failed: ", e)
+        print(f"⚠️ {key} updated failed: ", e)
 
 def check_login():
     try: 
@@ -71,7 +101,7 @@ def check_login():
         cookies = get_config(["COOKIES"])
         if response.status_code == 200 and "ASP.NET_SessionId" in cookies:
             data = response.json()
-            CONSOLE_OUTPUT.tqdm_write("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
+            print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
             print()
             return True
         else: 
@@ -80,7 +110,7 @@ def check_login():
         set_config("TOKEN", "")
         set_config("WWWBEARER", "")
         set_config("COOKIES", "")
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in function check_login()")
+        print("❌ Error in function check_login()")
         return False
 
 def merge_amazon_invoices():
@@ -99,21 +129,21 @@ def merge_amazon_invoices():
                 combined_writer.add_page(reader.pages[1])
             if len(reader.pages) >= 3:
                 combined_writer.add_page(reader.pages[2])
-            CONSOLE_OUTPUT.tqdm_write(f"✅ Done: {pdf_file.name}")
+            print(f"✅ Done: {pdf_file.name}")
         except Exception as e:
-            CONSOLE_OUTPUT.tqdm_write(f"⚠️ Error {pdf_file.name}: {e}")
+            print(f"⚠️ Error {pdf_file.name}: {e}")
 
     with open(output_file, "wb") as f:
         combined_writer.write(f)
 
-    CONSOLE_OUTPUT.tqdm_write(f"\n🎉 Success: {output_file}")
+    print(f"\n🎉 Success: {output_file}")
 
 def merge_pdfs():
     folder_path = input("📂 Please input folder path of the pdf files: ").strip()
     output_filename = "merged_output.pdf"
 
     if not os.path.isdir(folder_path):
-        CONSOLE_OUTPUT.tqdm_write("❌ Invalid folder path")
+        print("❌ Invalid folder path")
 
     pdf_writer = PdfWriter()
 
@@ -127,7 +157,7 @@ def merge_pdfs():
     pdf_files.sort(key=lambda f: os.path.getctime(f))
 
     if not pdf_files:
-        CONSOLE_OUTPUT.tqdm_write("❌ No pdf files")
+        print("❌ No pdf files")
         return
 
     for pdf_path in pdf_files:
@@ -135,15 +165,15 @@ def merge_pdfs():
             reader = PdfReader(pdf_path)
             for page in reader.pages:
                 pdf_writer.add_page(page)
-            CONSOLE_OUTPUT.tqdm_write(f"✅ Add: {os.path.basename(pdf_path)}")
+            print(f"✅ Add: {os.path.basename(pdf_path)}")
         except Exception as e:
-            CONSOLE_OUTPUT.tqdm_write(f"⚠️ Skip {pdf_path}: {e}")
+            print(f"⚠️ Skip {pdf_path}: {e}")
 
     output_path = os.path.join(folder_path, output_filename)
     with open(output_path, "wb") as out_file:
         pdf_writer.write(out_file)
 
-    CONSOLE_OUTPUT.tqdm_write(f"\n🎉 Success the merged pdf file: {output_path}")
+    print(f"\n🎉 Success the merged pdf file: {output_path}")
 
 def set_headers():
     WWWBEARER = get_config(["WWWBEARER"])
@@ -192,7 +222,7 @@ def assamble_projects(projects):
 def check_folder(folderName):
     if not os.path.exists(folderName):
         os.makedirs(folderName)
-        CONSOLE_OUTPUT.tqdm_write(f"📁 Folder created: {folderName}")
+        print(f"📁 Folder created: {folderName}")
 
 def clear_folder(folderName):
     onedrivedir = get_config(["ONEDRIVEDIR"])
@@ -223,7 +253,7 @@ def get_vendor_email(clientID):
                         email += d["Email"]+";"
         return email
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in function get_vendor_email()")
+        print("❌ Error in function get_vendor_email()")
 
 def get_clientID(clientName):
     try:
@@ -245,7 +275,7 @@ def get_clientID(clientName):
             if record['IsClient'] == "Y":
                 return record['Key']
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌ Error in function get_clientID() with input: " + clientName)
+        print("❌ Error in function get_clientID() with input: " + clientName)
 
 def save_excel(wb, records):
     try:
@@ -261,16 +291,16 @@ def save_excel(wb, records):
 
         return excelName
     except Exception as e:
-        CONSOLE_OUTPUT.tqdm_write("❌Error in function save_excel()")
+        print("❌Error in function save_excel()")
 
 def download_with_progress(url, save_path, latest_version):
+    import requests
     r = requests.get(url, stream=True)
     total = int(r.headers.get('content-length', 0))
-
     downloaded = 0
     chunk_size = 8192
 
-    CONSOLE_OUTPUT.tqdm_write("\nDownloading update...\n")
+    print("\nDownloading update...\n")  # 只终端显示
 
     with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size):
@@ -279,13 +309,49 @@ def download_with_progress(url, save_path, latest_version):
                 downloaded += len(chunk)
 
                 percent = downloaded / total * 100 if total else 0
-                bar = "█" * int(percent / 2)   # 50 chars bar
+                bar = "█" * int(percent / 2)
                 space = " " * (50 - len(bar))
 
-                print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="")
+                print(f"\r[{bar}{space}] {percent:6.2f}%  ({downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB)", end="", flush=True)
 
-    CONSOLE_OUTPUT.tqdm_write("\nDownload complete!\n")
+    print(f"Downloaded {downloaded/1024/1024:.2f} MB / {total/1024/1024:.2f} MB")
+    print("Download complete!")
     set_config("VERSION", latest_version)
+
+
+def check_update():
+    GITHUB_REPO = "Coding-Lou/Vantagepoint_Automation"
+    EXE_NAME = "start.exe" 
+    VERSION = get_config(["VERSION"])
+
+    try:
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        r = requests.get(url, timeout=10)
+        data = r.json()
+
+        latest_version = data["tag_name"].replace("v_", "")
+        asset = data["assets"][0]
+        download_url = asset["browser_download_url"]
+
+        if latest_version == VERSION:
+            print("Already latest version.")
+            return
+
+        print(f"New version found: {latest_version}. Downloading update...")
+
+        temp_new_exe = os.path.join(os.getenv("TEMP"), EXE_NAME)
+
+        download_with_progress(download_url, temp_new_exe, latest_version)
+        
+        updater = os.path.join(os.path.dirname(sys.argv[0]), "updater.exe")
+        subprocess.Popen([updater, sys.argv[0], temp_new_exe])
+
+        print("Update started. Exiting old program...")
+        sys.exit(0)
+    
+    except Exception as e:
+        print(f"Failed to check/update version: {e}")
+        return
 
 def change_period(period):
     headers = set_headers()
@@ -306,25 +372,27 @@ def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
     with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    CONSOLE_OUTPUT.tqdm_write(f"Copied to the {output_file} / {sheet_name}")
+    print(f"Copied to the {output_file} / {sheet_name}")
 
-def findLastPO():
-    HEADERS = set_headers()
-    def checkPOExist(po):
-        try:
-            url = f"https://qcadeltek03.qcasystems.com/vantagepoint/vision/PurchaseOrder/POMaster/?searchType=ALL&filter={po}&page=1&pagesize=100&order=name"
-            response = requests.get(url, headers=HEADERS )
-            data = response.json()
-            return len(data) > 0
-        except Exception as e:
-            print(f"Function: checkPoExist of {po} had error {e}")
+def cleanup_projectID(project_id: str) -> str:
+    if not project_id:
+        return project_id
+    replace_map = {
+        "/": "[_$2F_]",
+        "&": "[_$26_]",
+    }
+    for k, v in replace_map.items():
+        project_id = project_id.replace(k, v)
+    return project_id
 
-    left = 20000
-    right = 100000
-    while (left < right-1):
-        mid = int(left + (right - left) / 2)
-        if (checkPOExist(mid)):
-            left = mid
-        else:
-            right = mid - 1
-    return left
+def cleanup_projectName(projName: str) -> str:
+    if not projName:
+        return projName
+    replace_map = {
+        " ": "%20",
+        "/": "%2f",
+        "&": "%26",
+    }
+    for k, v in replace_map.items():
+        projName = projName.replace(k, v)
+    return projName
