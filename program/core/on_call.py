@@ -1,5 +1,6 @@
 import os
 import win32com.client
+import pythoncom
 import tools.form_notifier as form_notifier
 import tools.util as util
 from datetime import datetime
@@ -33,39 +34,43 @@ def run_oncall_task(vendorName: str):
     error_msg = ""
 
     try:
-        # Launch Excel COM object
+        pythoncom.CoInitialize()
+
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
-
-        # Open workbook
         wb = excel.Workbooks.Open(excel_path)
 
-        # Run VBA macro
-        excel.Application.Run(MACRO_NAME)
-        time.sleep(120)  # Wait for macro to complete 
+        # Run macro (fully qualified)
+        excel.Application.Run(f"'{wb.Name}'!{MACRO_NAME}")
 
-        # Attempt to read VBA execution status from named ranges
+        # Read execution status
         try:
-            status_name = wb.Names("PY_STATUS").RefersTo.replace('"', '')
-            if status_name == "FAILED":
-                status = "FAILED"
-                error_msg = wb.Names("PY_ERROR").RefersTo.replace('"', '')
+            status = wb.Names("PY_STATUS").RefersTo
+            status = status.replace('=', '').replace('"', '')
+
+            if status == "FAILED":
+                error_msg = wb.Names("PY_ERROR").RefersTo
+                error_msg = error_msg.replace('=', '').replace('"', '')
+            else:
+                error_msg = None
+
         except Exception:
-            # If VBA does not provide status, assume success
-            pass
+            status = "SUCCESS"
+            error_msg = None
 
     except Exception as e:
-        # Catch Python COM exceptions
         status = "FAILED"
         error_msg = str(e)
-
+    
     finally:
-        # Close workbook and quit Excel
-        if wb:
-            wb.Close(False)
-        if excel:
+        if wb is not None:
+            wb.Close(SaveChanges=False)
+    
+        if excel is not None:
             excel.Quit()
+    
+        pythoncom.CoUninitialize()
 
     # Prepare notification message
     message = f"On-call VBA execution for '{excel_name}' finished.\nStatus: {status}"
