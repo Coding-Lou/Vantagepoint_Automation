@@ -6,9 +6,6 @@ from openpyxl import Workbook
 from zoneinfo import ZoneInfo
 import core.packing_slip as packing_slip
 
-global HEADERS
-HEADERS = util.set_headers()
-
 def get_master_key(po):
     try:
         url = f"https://qcadeltek03.qcasystems.com/vantagepoint/vision/PurchaseReceive/POMaster/?searchType=ALL&filter={po}&page=1&pagesize=100&order=name"
@@ -65,13 +62,15 @@ def download_packing_list(shippingData):
         print(f"Downloading {shippingData["FileName"]} had error {e}")
 
 def main():
+    global HEADERS
+    HEADERS = util.set_headers()
     date = input("Please input the start date (format: 2025-04-01): ")
     util.check_folder("packing_slip")
     util.clear_folder("packing_slip")
     wb = Workbook()
     ws = wb.active
     ws.append(["PO","Vendor", "PackingSlip", "Shipping Date", "Receiving Date", "Days Difference", "Packing List"])
-    po = 24004
+    po = 24139
     while po > 20000:
         try:
             masterData = get_master_key(po)
@@ -103,7 +102,7 @@ def main():
                         continue
                     receivingDate = receivingDict[shipping["DetailPKey"]]
                     download_packing_list(shipping)
-                    fromAI = packing_slip.main(shipping["FileName"])
+                    fromAI = packing_slip.main(shipping["FileName"], receivingDate)
                     if fromAI == "Not found" :
                         print(f"{po+1} | {vendorName} | {packingDict[shipping["DetailPKey"]]} | | { receivingDate.strftime("%Y-%m-%d")} | ---------- | {shipping["FileName"]} ")
                         ws.append([po+1,vendorName, packingDict[shipping["DetailPKey"]], "" , receivingDate.strftime("%Y-%m-%d"), "" , shipping["FileName"]])
