@@ -1,0 +1,235 @@
+"""
+Home page (Dashboard) for the application.
+
+Displays overview, login status, recent tasks, and quick access buttons.
+"""
+from typing import Optional
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PySide6.QtCore import Qt
+
+from qfluentwidgets import (
+    CardWidget,
+    PrimaryPushButton,
+    FluentIcon,
+    BodyLabel,
+    TitleLabel,
+    CaptionLabel,
+    HyperlinkButton,
+    IndeterminateProgressRing,
+)
+
+from ui.services.app_context import get_app_context
+
+
+class HomePage(QWidget):
+    """
+    Home page with dashboard layout.
+    
+    Features:
+    - Application overview
+    - Login status display
+    - Quick access buttons
+    - Recent tasks (placeholder)
+    """
+    
+    def __init__(self, parent=None):
+        """Initialize home page."""
+        super().__init__(parent)
+        self.app_context = get_app_context()
+        self._setup_ui()
+        self._connect_signals()
+        self._update_login_status()
+    
+    def _setup_ui(self) -> None:
+        """Setup UI layout."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+        
+        # Title section
+        title_label = TitleLabel("QCA Accounting Automation Tool")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(title_label)
+        
+        # Description
+        desc_label = BodyLabel(
+            "Automate accounting tasks including AP remittance, AR statements, "
+            "project status reports, and more."
+        )
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+        
+        # Status cards row
+        status_layout = QHBoxLayout()
+        status_layout.setSpacing(12)
+        
+        # Login status card
+        self.login_status_card = self._create_status_card(
+            "Login Status",
+            "Not logged in",
+            FluentIcon.PEOPLE,
+            "#f44336"  # Red for not logged in
+        )
+        status_layout.addWidget(self.login_status_card)
+        
+        # System status card (placeholder)
+        system_status_card = self._create_status_card(
+            "System Status",
+            "Ready",
+            FluentIcon.SETTING,
+            "#4caf50"  # Green
+        )
+        status_layout.addWidget(system_status_card)
+        
+        status_layout.addStretch()
+        layout.addLayout(status_layout)
+        
+        # Quick actions section
+        actions_label = TitleLabel("Quick Actions")
+        actions_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(actions_label)
+        
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(12)
+        
+        # AP quick action button
+        ap_btn = PrimaryPushButton("AP Remittance", self, FluentIcon.DOCUMENT)
+        ap_btn.setMinimumHeight(40)
+        ap_btn.clicked.connect(self._on_ap_clicked)
+        actions_layout.addWidget(ap_btn)
+        
+        # AR quick action button
+        ar_btn = PrimaryPushButton("AR Notification", self, FluentIcon.DOCUMENT)
+        ar_btn.setMinimumHeight(40)
+        ar_btn.clicked.connect(self._on_ar_clicked)
+        actions_layout.addWidget(ar_btn)
+        
+        # Login button
+        self.login_btn = PrimaryPushButton("Sign In", self, FluentIcon.PEOPLE)
+        self.login_btn.setMinimumHeight(40)
+        self.login_btn.clicked.connect(self._on_login_clicked)
+        actions_layout.addWidget(self.login_btn)
+        
+        actions_layout.addStretch()
+        layout.addLayout(actions_layout)
+        
+        # Recent tasks section (placeholder)
+        recent_label = TitleLabel("Recent Tasks")
+        recent_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(recent_label)
+        
+        recent_card = CardWidget(self)
+        recent_layout = QVBoxLayout(recent_card)
+        recent_layout.setContentsMargins(16, 16, 16, 16)
+        
+        no_tasks_label = CaptionLabel("No recent tasks")
+        no_tasks_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        recent_layout.addWidget(no_tasks_label)
+        
+        layout.addWidget(recent_card)
+        
+        layout.addStretch()
+    
+    def _create_status_card(
+        self,
+        title: str,
+        status: str,
+        icon: FluentIcon,
+        color: str
+    ) -> CardWidget:
+        """
+        Create a status card widget.
+        
+        Args:
+            title: Card title
+            status: Status text
+            icon: Icon to display
+            color: Status color
+            
+        Returns:
+            CardWidget instance
+        """
+        card = CardWidget(self)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(8)
+        
+        # Title
+        title_label = BodyLabel(title)
+        title_label.setStyleSheet("font-weight: 600;")
+        card_layout.addWidget(title_label)
+        
+        # Status
+        status_label = BodyLabel(status)
+        status_label.setStyleSheet(f"color: {color}; font-size: 14px;")
+        card_layout.addWidget(status_label)
+        
+        return card
+    
+    def _connect_signals(self) -> None:
+        """Connect application context signals."""
+        self.app_context.login_state_changed.connect(self._on_login_state_changed)
+        self.app_context.user_info_changed.connect(self._on_user_info_changed)
+    
+    def _update_login_status(self) -> None:
+        """Update login status display."""
+        is_logged_in = self.app_context.is_logged_in
+        user_email = self.app_context.user_email
+        
+        # Update status card
+        status_layout = self.login_status_card.layout()
+        if status_layout and status_layout.count() >= 2:
+            status_label = status_layout.itemAt(1).widget()
+            if isinstance(status_label, QLabel):
+                if is_logged_in:
+                    status_text = f"Logged in\n{user_email or 'User'}"
+                    status_label.setStyleSheet("color: #4caf50; font-size: 14px;")  # Green
+                else:
+                    status_text = "Not logged in"
+                    status_label.setStyleSheet("color: #f44336; font-size: 14px;")  # Red
+                status_label.setText(status_text)
+        
+        # Update login button
+        if is_logged_in:
+            self.login_btn.setText("Re-login")
+            self.login_btn.setIcon(FluentIcon.SYNC)
+        else:
+            self.login_btn.setText("Sign In")
+            self.login_btn.setIcon(FluentIcon.PEOPLE)
+    
+    def _on_login_state_changed(self, is_logged_in: bool) -> None:
+        """
+        Handle login state changed signal.
+        
+        Args:
+            is_logged_in: Whether user is logged in
+        """
+        self._update_login_status()
+    
+    def _on_user_info_changed(self, user_info: dict) -> None:
+        """
+        Handle user info changed signal.
+        
+        Args:
+            user_info: User information dictionary
+        """
+        self._update_login_status()
+    
+    def _on_ap_clicked(self) -> None:
+        """Handle AP button click - navigate to AP page."""
+        # This will be connected in MainWindow to navigate to AP page
+        if hasattr(self, '_navigate_to_ap'):
+            self._navigate_to_ap()
+    
+    def _on_ar_clicked(self) -> None:
+        """Handle AR button click - navigate to AR page."""
+        # This will be connected in MainWindow to navigate to AR page
+        if hasattr(self, '_navigate_to_ar'):
+            self._navigate_to_ar()
+    
+    def _on_login_clicked(self) -> None:
+        """Handle login button click - trigger login."""
+        # This will be connected in MainWindow to show login dialog
+        if hasattr(self, '_trigger_login'):
+            self._trigger_login()
+    
