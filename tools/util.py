@@ -143,11 +143,11 @@ def check_login():
         cookies = get_config(["COOKIES"])
         if response.status_code == 200 and "ASP.NET_SessionId" in cookies:
             data = response.json()
-            print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
-            print()
-            return True
+            #print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
+            #print()
+            return data["d"]["UserInfo"]["EMail"]
         else: 
-            return False
+            return None
     except:
         set_config("TOKEN", "")
         set_config("WWWBEARER", "")

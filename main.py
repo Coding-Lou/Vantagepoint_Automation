@@ -30,7 +30,6 @@ log_file = LOGS_DIR / "runtime.log"
 
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
 
-
 def _agent_log(
     hypothesis_id: str,
     location: str,

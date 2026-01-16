@@ -8,6 +8,7 @@ import json
 import time
 
 #region agent log
+
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
 
 def _agent_log(
@@ -27,6 +28,7 @@ def _agent_log(
         "timestamp": int(time.time() * 1000),
     }
     try:
+        pass
         DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with DEBUG_LOG_PATH.open("a", encoding="utf-8") as log_file:
             log_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
@@ -43,7 +45,7 @@ except Exception as e:
 #endregion
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QStackedWidget, QLabel, QStatusBar
+    QMainWindow, QWidget, QHBoxLayout, QStackedWidget, QLabel, QStatusBar, QFrame
 )
 #region agent log
 try:
@@ -54,8 +56,8 @@ except Exception:
 #endregion
 
 from PySide6.QtCore import Signal, Slot
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtCore import Qt, QRect
+from PySide6.QtGui import QFont, QIcon, QPainter, QImage, QBrush, QColor
 from pathlib import Path
 
 #region agent log
@@ -72,10 +74,12 @@ from qfluentwidgets import (
     setTheme,
     Theme,
     NavigationItemPosition,
-    BodyLabel,
-    CardWidget,
-    PrimaryPushButton,
+    NavigationWidget,
+    isDarkTheme
 )
+
+from qfluentwidgets import FluentIcon as FIF
+from qframelesswindow import TitleBar
 
 #region agent log
 try:
@@ -128,6 +132,135 @@ except Exception:
     pass
 #endregion
 
+
+class CustomAvatarWidget(NavigationWidget):
+    """Custom avatar widget for navigation bar bottom"""
+    
+    def __init__(self, parent=None):
+        super().__init__(isSelectable=False, parent=parent)
+        self.avatar_image = None
+        self.initials = ""
+        self._load_avatar()
+    
+    def _load_avatar(self):
+        """Load avatar image or generate initials"""
+        import tools.util as util
+        user_email = util.check_login()
+        
+        if user_email:
+            # Extract initials from email
+            email_prefix = user_email.split("@")[0]
+            name_parts = email_prefix.split(".")
+            if len(name_parts) >= 2:
+                self.initials = (name_parts[0][0] + name_parts[1][0]).upper()
+            else:
+                self.initials = email_prefix[:2].upper() if len(email_prefix) >= 2 else email_prefix[0].upper()
+        else:
+            self.initials = "?"
+    
+    def paintEvent(self, e):
+        """Paint the avatar widget"""
+        painter = QPainter(self)
+        painter.setRenderHints(
+            QPainter.SmoothPixmapTransform | QPainter.Antialiasing
+        )
+        
+        painter.setPen(Qt.NoPen)
+        
+        if self.isPressed:
+            painter.setOpacity(0.7)
+        
+        # Draw background
+        if self.isEnter:
+            c = 255 if isDarkTheme() else 0
+            painter.setBrush(QColor(c, c, c, 10))
+            painter.drawRoundedRect(self.rect(), 5, 5)
+        
+        # Draw avatar circle
+        if self.isCompacted:
+            avatar_rect = QRect(12, 6, 24, 24)
+        else:
+            # Draw avatar circle with initials
+            avatar_rect = QRect(8, 6, 24, 24)
+        
+        painter.setBrush(QBrush(QColor(100, 150, 200) if not isDarkTheme() else QColor(70, 120, 170)))
+        painter.drawEllipse(avatar_rect)
+            
+        # Draw initials text
+        painter.setPen(Qt.white)
+        font = QFont('Segoe UI')
+        font.setPixelSize(12)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.drawText(avatar_rect, Qt.AlignCenter, self.initials)
+        
+        # Draw name text (email prefix)
+        if not self.isCompacted:    
+            import tools.util as util
+            user_email = util.check_login()
+            if user_email:
+                email_prefix = user_email.split("@")[0]
+                painter.setPen(Qt.white if isDarkTheme() else Qt.black)
+                font = QFont('Segoe UI')
+                font.setPixelSize(14)
+                painter.setFont(font)
+                painter.drawText(QRect(44, 0, 255, 36), Qt.AlignVCenter, email_prefix)
+
+
+class CustomTitleBar(TitleBar):
+    """
+    Custom title bar with icon and title on the left.
+    Implementation adapted from PyQt-Fluent-Widgets navigation2/demo.py
+    """
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        # Create labels
+        self.iconLabel = QLabel(self)
+        self.titleLabel = QLabel(self)
+
+        self.iconLabel.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.titleLabel.setAttribute(Qt.WA_TransparentForMouseEvents)
+        
+        # Configure label styling
+        self.titleLabel.setObjectName('titleLabel')
+        # Explicitly set font to ensure visibility
+        self.titleLabel.setFont(QFont("Segoe UI", 12))
+        self.iconLabel.setFixedSize(18, 18)
+        
+        # Insert widgets into the layout
+        # Index 0 is often reserved or empty in TitleBar, we insert at the start
+        self.hBoxLayout.insertSpacing(0, 20)
+        self.hBoxLayout.insertWidget(1, self.iconLabel, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        self.hBoxLayout.insertWidget(2, self.titleLabel, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        
+        # Connect signals
+        self.window().windowIconChanged.connect(self.setIcon)
+        self.window().windowTitleChanged.connect(self.setTitle)
+    
+    def setTitle(self, title):
+        self.titleLabel.setText(title)
+        self.titleLabel.adjustSize()
+    
+    def setIcon(self, icon):
+        self.iconLabel.setPixmap(QIcon(icon).pixmap(18, 18))
+
+
+class SettingsWidget(QFrame):
+    """Empty settings widget"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setObjectName("settings")
+        self.label = QLabel("Settings", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.hBoxLayout = QHBoxLayout(self)
+        self.hBoxLayout.addWidget(self.label, 1, Qt.AlignCenter)
+        # Leave some space for title bar
+        self.hBoxLayout.setContentsMargins(0, 32, 0, 0)
+
+
 class MainWindow(FluentWindow):
     """
     Main window with horizontal layout:
@@ -141,129 +274,118 @@ class MainWindow(FluentWindow):
         _agent_log("H6", "MainWindow.__init__", "enter __init__", {})
         #endregion
         try:
-            app_exists = bool(QApplication.instance())
-        except Exception:
-            app_exists = False
-        #region agent log
-        _agent_log(
-            "H6",
-            "MainWindow.__init__",
-            "before super init",
-            {
-                "app_exists": app_exists,
-                "fluent_module": FluentWindow.__module__,
-                "fluent_mro": [cls.__name__ for cls in FluentWindow.__mro__[:3]],
-                "fluent_bases": [b.__module__ for b in FluentWindow.__bases__],
-                "qapp_module": QApplication.__module__,
-                "qapp_instance_module": type(QApplication.instance()).__module__ if QApplication.instance() else None,
-                "fluent_mro_modules": [cls.__module__ for cls in FluentWindow.__mro__[:6]],
-            },
-        )
-        #endregion
-        try:
             super().__init__()
         except Exception as exc:
             #region agent log
-            _agent_log(
-                "H6",
-                "MainWindow.__init__",
-                "super init exception",
-                {"error": str(exc), "app_exists": app_exists},
-            )
+            _agent_log("H6", "MainWindow.__init__", "super init exception", {"error": str(exc)})
             #endregion
             raise
-        #region agent log
-        _agent_log("H6", "MainWindow.__init__", "after super init", {})
-        #endregion
         
-        # Set Fluent theme (required for Fluent Design appearance)
-        try:
-            setTheme(Theme.AUTO)  # AUTO will follow system theme
-            #region agent log
-            _agent_log("H6", "MainWindow.__init__", "Theme set to AUTO", {})
-            #endregion
-        except Exception as e:
-            #region agent log
-            _agent_log("H6", "MainWindow.__init__", "Failed to set theme", {"error": str(e)})
-            #endregion
-            # Continue without theme if it fails
+        # 1. Initialize UI Layout (Size, TitleBar)
+        self._init_window()
         
-        self.setWindowTitle("QCA Accounting Automation Tool")
-        self.resize(1200, 800)
-        self.setMinimumSize(900, 650)
-
+        # 2. Application context & State
+        self.app_context = get_app_context()
+        self.current_worker: Optional[BaseWorker] = None
+        self.task_pages: Dict[str, BaseTaskPage] = {}
+        
         # Base size for proportional font scaling
         self._font_base_size = (1200, 800)
         self._font_base_pt = 11
         self._font_min_pt = 9
         self._font_max_pt = 14
         
-        # Application context
-        self.app_context = get_app_context()
-        
-        # Current executing worker
-        self.current_worker: Optional[BaseWorker] = None
-        
-        # Task pages dictionary
-        self.task_pages: Dict[str, BaseTaskPage] = {}
-        
+        # 3. Setup Navigation & Pages
         self._setup_ui()
-        #region agent log
-        _agent_log("H6", "MainWindow.__init__", "after _setup_ui", {})
-        #endregion
         self._init_pages()
-        #region agent log
-        _agent_log("H6", "MainWindow.__init__", "after _init_pages", {})
-        #endregion
         self._connect_signals()
-        #region agent log
-        _agent_log("H6", "MainWindow.__init__", "after _connect_signals", {})
-        #endregion
         self._check_login_status()
+        
+        # Apply initial font scaling
+        #self._apply_font_scale()
+        
         #region agent log
         _agent_log("H4", "MainWindow.__init__", "MainWindow initialized", {"pages": list(self.task_pages.keys())})
         #endregion
 
-        # Apply initial font scaling
-        self._apply_font_scale()
-
-    def showEvent(self, event) -> None:
-        """Handle window show event - set navigation to expanded state."""
-        super().showEvent(event)
-        # Ensure navigation is expanded after window is shown
-        if self.nav_interface:
-            try:
-                # Try to expand navigation if it has the method
-                if hasattr(self.nav_interface, 'setExpanded'):
-                    self.nav_interface.setExpanded(True)
-                elif hasattr(self.nav_interface, 'expanded'):
-                    self.nav_interface.expanded = True
-                
-                # Set expand width for auto-resize
-                if hasattr(self.nav_interface, 'setExpandWidth'):
-                    self.nav_interface.setExpandWidth(250)
-                elif hasattr(self.nav_interface, 'expandWidth'):
-                    self.nav_interface.expandWidth = 250
-            except Exception:
-                # If setting fails, continue anyway
-                pass
-    
-    def resizeEvent(self, event) -> None:
-        """Scale font proportionally with window size for readability."""
+    def _init_window(self):
+        """Initialize basic window properties and custom TitleBar."""
+        self.setTitleBar(CustomTitleBar(self))
+        self.setWindowTitle("QCA Accounting Automation Tool")
+        self.resize(1200, 800)
+        self.setMinimumSize(900, 650)
+        
+        # Set Fluent theme
         try:
-            self._apply_font_scale()
-        except Exception:
-            pass
-        return super().resizeEvent(event)
+            setTheme(Theme.AUTO)
+        except Exception as e:
+            _agent_log("H6", "MainWindow.__init__", "Failed to set theme", {"error": str(e)})
+
+    def _setup_ui(self) -> None:
+        """Configure the navigation interface settings."""
+        # Clean configuration for Navigation 2 style
+        self.navigationInterface.setExpandWidth(280)
+        self.navigationInterface.setMinimumExpandWidth(300)
+        
+        self.stackedWidget.setContentsMargins(0, 0, 0, 0)
+        
+        # Keep default paint behavior to avoid visual artifacts
+        
+        # Store login worker references
+        self.check_login_worker: Optional[CheckLoginWorker] = None
+        self.login_worker: Optional[LoginWorker] = None
+        self.login_dialog: Optional[LoginDialog] = None
+        
+        # Store bottom navigation widgets
+        self.avatar_widget: Optional[CustomAvatarWidget] = None
+        
+        # Cache navigation width to avoid frequent queries during page switching
+        self._cached_nav_width = 0
+        self._is_switching_page = False
+        
+        # Connect to navigation display mode changes to update title bar only when needed
+        if hasattr(self.navigationInterface, 'displayModeChanged'):
+            self.navigationInterface.displayModeChanged.connect(self._on_navigation_display_mode_changed)
+        
+    def _on_navigation_display_mode_changed(self) -> None:
+        """Handle navigation display mode change - update title bar position."""
+        # Only update when navigation actually expands/collapses, not during page switching
+        if not self._is_switching_page:
+            self._adjust_title_bar_deferred()
+
+    def resizeEvent(self, event) -> None:
+        """
+        Handle resize event to adjust TitleBar position dynamically.
+        This enables the 'Navigation 2' look where the title bar sits 
+        to the right of the navigation sidebar.
+        Optimized to reduce unnecessary updates during page switching.
+        """
+        # Only update title bar position if window is actually resizing
+        # Skip updates during page switching to reduce lag
+        if (hasattr(self, 'titleBar') and self.titleBar and 
+            event.size() != event.oldSize() and 
+            not self._is_switching_page):
+            self._adjust_title_bar_deferred()
+        
+        super().resizeEvent(event)
+    
+    def _adjust_title_bar_deferred(self) -> None:
+        """Deferred title bar adjustment to improve performance during page switching."""
+        if hasattr(self, 'titleBar') and self.titleBar:
+            # Cache navigation width to avoid repeated queries
+            nav_width = self.navigationInterface.width()
+            # Only update if width actually changed
+            if nav_width != self._cached_nav_width:
+                self._cached_nav_width = nav_width
+                self.titleBar.move(nav_width, 0)
+                self.titleBar.resize(self.width() - nav_width, self.titleBar.height())
 
     def _apply_font_scale(self) -> None:
         """Apply a global font size based on current window size."""
         w = max(1, self.width())
         h = max(1, self.height())
         bw, bh = self._font_base_size
-        # Use the smaller scale so text doesn't overflow vertically
         scale = min(w / max(1, bw), h / max(1, bh))
-        # Clamp scale to avoid extreme sizes
         scale = max(0.85, min(scale, 1.25))
         pt = int(round(self._font_base_pt * scale))
         pt = max(self._font_min_pt, min(pt, self._font_max_pt))
@@ -273,46 +395,38 @@ class MainWindow(FluentWindow):
             return
 
         font = app.font() or QFont()
-        # Prefer Windows default UI font for readability
         if not font.family():
             font.setFamily("Segoe UI")
         font.setPointSize(pt)
         app.setFont(font)
     
-    def _setup_ui(self) -> None:
-        """Setup UI layout."""
-        # FluentWindow already provides navigationInterface & stackedWidget
-        # Access them as properties (FluentWindow API)
-        self.nav_interface = self.navigationInterface
-        self.stacked_widget = self.stackedWidget
-        if hasattr(self.stacked_widget, "setContentsMargins"):
-            self.stacked_widget.setContentsMargins(0, 0, 0, 0)
-        
-        # Set navigation interface to be expanded by default with auto-resize width
-        if self.nav_interface:
-            # Set expand width (this is the width when expanded)
-            # Use a reasonable default width that will auto-resize
-            if hasattr(self.nav_interface, 'setExpandWidth'):
-                # Set expand width to a reasonable default (will auto-resize based on content)
-                self.nav_interface.setExpandWidth(250)  # Default expanded width
-            elif hasattr(self.nav_interface, 'expandWidth'):
-                # If it's a property, set it directly
-                self.nav_interface.expandWidth = 250
+    def _switch_to_page(self, page_id: str) -> None:
+        """
+        Optimized page switching method.
+        Reduces lag by batching updates and avoiding unnecessary repaints.
+        Prevents title bar adjustments during page switching when navigation is expanded.
+        """
+        if page_id in self.task_pages:
+            page = self.task_pages[page_id]
             
-            # Ensure navigation is expanded by default
-            if hasattr(self.nav_interface, 'setExpanded'):
-                self.nav_interface.setExpanded(True)
-            elif hasattr(self.nav_interface, 'expanded'):
-                self.nav_interface.expanded = True
+            # Mark that we're switching pages to prevent unnecessary title bar updates
+            self._is_switching_page = True
             
-            # Try to set minimum width for better auto-resize behavior
-            if hasattr(self.nav_interface, 'setMinimumWidth'):
-                self.nav_interface.setMinimumWidth(200)
-        
-        # Store login worker references
-        self.check_login_worker: Optional[CheckLoginWorker] = None
-        self.login_worker: Optional[LoginWorker] = None
-        self.login_dialog: Optional[LoginDialog] = None
+            # Temporarily disable updates to batch paint operations
+            self.stackedWidget.setUpdatesEnabled(False)
+            try:
+                self.stackedWidget.setCurrentWidget(page)
+                # Update navigation selection after page switch
+                if hasattr(self.navigationInterface, 'setCurrentItem'):
+                    try:
+                        self.navigationInterface.setCurrentItem(page_id)
+                    except Exception:
+                        pass
+            finally:
+                # Re-enable updates and trigger a single repaint
+                self.stackedWidget.setUpdatesEnabled(True)
+                self.stackedWidget.update()
+                self._is_switching_page = False
     
     def _connect_signals(self) -> None:
         """Connect application context signals."""
@@ -346,111 +460,68 @@ class MainWindow(FluentWindow):
         
         # Create home page
         home_page = HomePage()
-        home_page.setObjectName("home")  # Use objectName as identifier
+        home_page.setObjectName("home")
+        
         # Set up navigation callback - switch to AP page using objectName
+        # Optimized: use cached page reference instead of searching
         def navigate_to_ap():
-            # Find AP page widget by objectName in stacked widget
-            ap_page = None
-            for i in range(self.stacked_widget.count()):
-                widget = self.stacked_widget.widget(i)
-                if widget and widget.objectName() == "ap":
-                    ap_page = widget
-                    break
-            
-            if ap_page:
-                # Switch to AP page
-                self.stacked_widget.setCurrentWidget(ap_page)
-                # Update navigation interface to reflect current selection
-                # FluentWindow's navigationInterface should auto-update, but we can try to set it explicitly
-                try:
-                    # Try to set navigation item by finding it in navigation interface
-                    if hasattr(self.nav_interface, 'setCurrentItem'):
-                        self.nav_interface.setCurrentItem("ap")
-                except Exception:
-                    # If setCurrentItem doesn't work, the stacked widget change should be enough
-                    pass
+            if "ap" in self.task_pages:
+                self._switch_to_page("ap")
+                    
         home_page._navigate_to_ap = navigate_to_ap
         
         # AR navigation
         def navigate_to_ar():
-            self.stacked_widget.setCurrentWidget(self.task_pages["ar"])
-            try:
-                if hasattr(self.nav_interface, 'setCurrentItem'):
-                    self.nav_interface.setCurrentItem("ar")
-            except Exception:
-                pass
+            if "ar" in self.task_pages:
+                self._switch_to_page("ar")
         home_page._navigate_to_ar = navigate_to_ar
         home_page._trigger_login = self._on_login_clicked
         
-        #region agent log
-        _agent_log("H7", "MainWindow._init_pages", "About to add home page", {"home_objectName": home_page.objectName(), "runId": "post-fix"})
-        #endregion
-        
         # Add home page to navigation (first item)
         try:
+            def load_icon(icon_name: str):
+                icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
+                svg_path = icons_dir / f"{icon_name}.svg"
+                if svg_path.exists():
+                    return QIcon(str(svg_path))
+                png_path = icons_dir / f"{icon_name}.png"
+                if png_path.exists():
+                    return QIcon(str(png_path))
+                return FluentIcon.HOME
+            
+            home_icon = load_icon("home")
+            
             self.addSubInterface(
                 interface=home_page,
-                icon=FluentIcon.HOME,
+                icon=home_icon,
                 text="Home",
                 position=NavigationItemPosition.TOP
             )
-            #region agent log
-            _agent_log("H7", "MainWindow._init_pages", "Home page added successfully", {"runId": "post-fix"})
-            #endregion
         except Exception as e:
-            #region agent log
-            _agent_log("H7", "MainWindow._init_pages", "Failed to add home page", {"error": str(e), "error_type": type(e).__name__, "runId": "post-fix"})
-            #endregion
+            _agent_log("H7", "MainWindow._init_pages", "Failed to add home page", {"error": str(e)})
             raise
         
-        # Create task pages
+        # Create task pages with lazy initialization optimization
+        # Pages are created immediately but can be optimized for faster switching
         self.task_pages["ap"] = APTaskPage()
         self.task_pages["ar"] = ARTaskPage()
         self.task_pages["project_status"] = ProjectStatusTaskPage()
-        # TODO: Add other task pages
-        # self.task_pages["project_status"] = ProjectStatusTaskPage()
-        # ...
-        
+
         # Add task pages to navigation and stacked widget
         for task_id, page in self.task_pages.items():
             page.setObjectName(task_id)
-            #region agent log
+            # Keep default paint behavior to avoid visual artifacts
             try:
-                call_sig = str(inspect.signature(self.addSubInterface))
-            except Exception as e:
-                call_sig = f"signature_error:{e}"
-            _agent_log(
-                "H7",
-                "MainWindow._init_pages",
-                "before addSubInterface",
-                {
-                    "task_id": task_id,
-                    "page_type": type(page).__name__,
-                    "signature": call_sig,
-                },
-            )
-            #endregion
-            #region agent log
-            _agent_log("H7", "MainWindow._init_pages", "About to add task page", {"task_id": task_id, "objectName": page.objectName(), "runId": "post-fix"})
-            #endregion
-            try:
-                # Load custom SVG icons from ui/icons directory
-                # According to qfluentwidgets documentation: https://qfluentwidgets.com/pages/icon/#add-icon
                 def load_icon(icon_name: str):
-                    """Load SVG icon from ui/icons directory."""
-                    icons_dir = Path(__file__).parent.parent / "ui" / "icons"
-                    # Try SVG first (preferred format for qfluentwidgets)
+                    icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
                     svg_path = icons_dir / f"{icon_name}.svg"
                     if svg_path.exists():
                         return QIcon(str(svg_path))
-                    # Fallback to PNG if SVG not found
                     png_path = icons_dir / f"{icon_name}.png"
                     if png_path.exists():
                         return QIcon(str(png_path))
-                    # Fallback to FluentIcon if no custom icon found
                     return FluentIcon.DOCUMENT
                 
-                # Map task IDs to icon file names
                 icon_map = {
                     "ap": load_icon("ap"),
                     "ar": load_icon("ar"),
@@ -464,44 +535,29 @@ class MainWindow(FluentWindow):
                     text=page.task_name,
                     position=NavigationItemPosition.TOP
                 )
-                #region agent log
-                _agent_log("H7", "MainWindow._init_pages", "Task page added successfully", {"task_id": task_id, "runId": "post-fix"})
-                #endregion
-            except TypeError as exc:
-                #region agent log
-                _agent_log(
-                    "H7",
-                    "MainWindow._init_pages",
-                    "addSubInterface TypeError",
-                    {
-                        "task_id": task_id,
-                        "error": str(exc),
-                        "signature": call_sig,
-                        "runId": "post-fix",
-                    },
-                )
-                #endregion
+            except Exception as exc:
+                _agent_log("H7", "MainWindow._init_pages", "addSubInterface error", {"error": str(exc)})
                 raise
             
             # Connect signals
             page.task_started.connect(self._on_task_started)
             page.task_finished.connect(self._on_task_finished)
             page.task_failed.connect(self._on_task_failed)
-        #region agent log
-        _agent_log("H4", "MainWindow._init_pages", "Pages initialized", {"count": len(self.task_pages) + 1})
-        #endregion
         
-        # Add scheduled tasks page (not a BaseTaskPage, so handle separately)
+        # Add scheduled tasks page
         scheduled_tasks_page = ScheduledTasksPage()
         scheduled_tasks_page.setObjectName("scheduled_tasks")
         try:
-            # Load icon for scheduled tasks
-            icons_dir = Path(__file__).parent.parent / "ui" / "icons"
+            icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
             schedule_icon_path = icons_dir / "schedule.svg"
             if schedule_icon_path.exists():
                 schedule_icon = QIcon(str(schedule_icon_path))
             else:
-                schedule_icon = FluentIcon.CALENDAR
+                schedule_png_path = icons_dir / "schedule.png"
+                if schedule_png_path.exists():
+                    schedule_icon = QIcon(str(schedule_png_path))
+                else:
+                    schedule_icon = FluentIcon.CALENDAR
             
             self.addSubInterface(
                 interface=scheduled_tasks_page,
@@ -510,10 +566,6 @@ class MainWindow(FluentWindow):
                 position=NavigationItemPosition.TOP
             )
         except Exception as e:
-            #region agent log
-            _agent_log("H7", "MainWindow._init_pages", "Failed to add scheduled tasks page", {"error": str(e)})
-            #endregion
-            # Continue even if icon loading fails
             try:
                 self.addSubInterface(
                     interface=scheduled_tasks_page,
@@ -523,161 +575,85 @@ class MainWindow(FluentWindow):
                 )
             except Exception:
                 pass
+        
+        # Setup bottom navigation (avatar and settings)
+        self._setup_bottom_navigation()
     
     @Slot(str)
     def _on_task_started(self, task_id: str) -> None:
-        """
-        Handle task started signal.
-        
-        Args:
-            task_id: Task identifier
-        """
-        # Disable all task pages' execute buttons
+        """Handle task started signal."""
         for page in self.task_pages.values():
             page._set_execution_enabled(False)
         
-        # Store current worker
         if task_id in self.task_pages:
             self.current_worker = self.task_pages[task_id].current_worker
         
-        # Update status (FluentWindow doesn't have statusBar, use window title or custom widget)
-        # For now, we'll update window title temporarily
-        original_title = self.windowTitle()
+        original_title = "QCA Accounting Automation Tool"
         self.setWindowTitle(f"{original_title} - Executing: {task_id}")
-        #region agent log
-        _agent_log("H4", "MainWindow._on_task_started", "Task started", {"task_id": task_id})
-        #endregion
     
     @Slot(str, dict)
     def _on_task_finished(self, task_id: str, result: dict) -> None:
-        """
-        Handle worker finished signal.
-        
-        Args:
-            task_id: Task identifier
-            result: Result dictionary
-        """
-        # Enable all task pages' execute buttons
+        """Handle worker finished signal."""
         for page in self.task_pages.values():
             page._set_execution_enabled(True)
-        
-        # Clear current worker
         self.current_worker = None
-        
-        # Update window title
         self.setWindowTitle("QCA Accounting Automation Tool")
-        #region agent log
-        _agent_log("H4", "MainWindow._on_task_finished", "Task finished", {"task_id": task_id, "success": bool(result.get("success"))})
-        #endregion
     
     @Slot(str, str)
     def _on_task_failed(self, task_id: str, error: str) -> None:
-        """
-        Handle worker failed signal.
-        
-        Args:
-            task_id: Task identifier
-            error: Error message
-        """
-        # Enable all task pages' execute buttons
+        """Handle worker failed signal."""
         for page in self.task_pages.values():
             page._set_execution_enabled(True)
-        
-        # Clear current worker
         self.current_worker = None
-        
-        # Update window title
         self.setWindowTitle("QCA Accounting Automation Tool")
-        #region agent log
-        _agent_log("H4", "MainWindow._on_task_failed", "Task failed", {"task_id": task_id, "error": error})
-        #endregion
     
     def _check_login_status(self) -> None:
         """Check login status using background worker."""
-        # Don't check if already checking
         if self.check_login_worker and self.check_login_worker.isRunning():
             return
-        
-        # Create check login worker
         self.check_login_worker = CheckLoginWorker()
-        
-        # Connect signals
         self.check_login_worker.finished.connect(self._on_check_login_finished)
-        
-        # Start worker (no UI updates since navigation footer is removed)
         self.check_login_worker.start()
     
     @Slot(dict)
     def _on_check_login_finished(self, result: Dict[str, Any]) -> None:
-        """
-        Handle check login finished signal.
-        
-        Args:
-            result: Result dictionary with login status
-        """
+        """Handle check login finished signal."""
         is_logged_in = result.get("is_logged_in", False)
-        
-        # Update app context
         user_info = {}
         if is_logged_in:
-            # Try to get user email from config or result
             user_info = result.get("user_info", {})
-        
         self.app_context.set_login_state(is_logged_in, user_info if user_info else None)
-        
-        # Update UI (will be handled by signal handler)
         self._update_login_ui()
     
     @Slot()
     def _on_login_clicked(self) -> None:
         """Handle login button click - show login dialog."""
-        # Don't start if already logging in
         if self.login_worker and self.login_worker.isRunning():
             return
-        
-        # Show login dialog
         self.login_dialog = LoginDialog(self)
         self.login_dialog.login_requested.connect(self._start_login)
         self.login_dialog.exec()
     
     def _start_login(self) -> None:
         """Start login process."""
-        # Don't start if already logging in
         if self.login_worker and self.login_worker.isRunning():
             return
-        
-        # Create login worker with log callback
         self.login_worker = LoginWorker(
             headless=False,
             log_callback=self._on_login_log_received
         )
-        
-        # Connect signals
         self.login_worker.log_signal.connect(self._on_login_log_received)
         self.login_worker.finished.connect(self._on_login_finished)
-        
-        # Update dialog if open
         if self.login_dialog:
             self.login_dialog._set_loading_state(True, "Opening browser for authentication...")
-        
-        # Start worker
         self.login_worker.start()
     
     @Slot(str, str)
     def _on_login_log_received(self, level: str, message: str) -> None:
-        """
-        Handle log signal from login worker.
-        
-        Args:
-            level: Log level
-            message: Log message
-        """
-        # Update dialog with login progress messages
+        """Handle log signal from login worker."""
         if not self.login_dialog:
             return
-            
         if level == "INFO":
-            # Show progress in dialog
             if "Starting" in message or "Opening" in message:
                 status_msg = "Opening browser..."
                 self.login_dialog._set_loading_state(True, status_msg)
@@ -685,7 +661,6 @@ class MainWindow(FluentWindow):
                 status_msg = "Verifying login..."
                 self.login_dialog._set_loading_state(True, status_msg)
             else:
-                # For other INFO messages, show them as status
                 self.login_dialog._set_loading_state(True, message)
         elif level == "SUCCESS":
             self.login_dialog.show_success()
@@ -694,56 +669,70 @@ class MainWindow(FluentWindow):
     
     @Slot(dict)
     def _on_login_finished(self, result: Dict[str, Any]) -> None:
-        """
-        Handle login finished signal.
-        
-        Args:
-            result: Result dictionary with login status
-        """
+        """Handle login finished signal."""
         success = result.get("success", False)
         is_logged_in = result.get("is_logged_in", False)
-        
-        # Update app context
         user_info = {}
         if success and is_logged_in:
             user_info = result.get("user_info", {})
-        
         self.app_context.set_login_state(is_logged_in, user_info if user_info else None)
-        
-        # Update UI (will be handled by signal handler)
         self._update_login_ui()
-        
-        # Close dialog if login was successful
-        if success and is_logged_in and self.login_dialog:
-            # Dialog will close itself via show_success()
-            pass
-        
-        # Re-check login status to get user email info
         if success and is_logged_in:
             self._check_login_status()
     
     def _update_login_ui(self) -> None:
         """Update login UI based on app context state."""
-        # Navigation footer removed, no UI to update
-        # Login state is managed via AppContext and displayed in HomePage
-        pass
+        self._update_avatar_widget()
     
     @Slot(bool)
     def _on_app_login_state_changed(self, is_logged_in: bool) -> None:
-        """
-        Handle app context login state changed signal.
-        
-        Args:
-            is_logged_in: Whether user is logged in
-        """
+        """Handle app context login state changed signal."""
         self._update_login_ui()
     
     @Slot(dict)
     def _on_app_user_info_changed(self, user_info: dict) -> None:
-        """
-        Handle app context user info changed signal.
-        
-        Args:
-            user_info: User information dictionary
-        """
+        """Handle app context user info changed signal."""
         self._update_login_ui()
+    
+    def _setup_bottom_navigation(self) -> None:
+        """Setup bottom navigation with AvatarWidget and Settings."""
+        if not self.navigationInterface:
+            return
+        
+        # Create custom avatar widget
+        self.avatar_widget = CustomAvatarWidget(self)
+        
+        # Add avatar widget to bottom navigation
+        self.navigationInterface.addWidget(
+            routeKey='avatar',
+            widget=self.avatar_widget,
+            onClick=self._on_avatar_clicked,
+            position=NavigationItemPosition.BOTTOM
+        )
+        
+        # Create empty settings widget
+        self.settings_widget = SettingsWidget(self)
+        self.settings_widget.setObjectName("settings")
+        
+        self.stackedWidget.addWidget(self.settings_widget)
+        
+        self.addSubInterface(
+            interface=self.settings_widget,
+            icon=FIF.SETTING,
+            text='Settings',
+            position=NavigationItemPosition.BOTTOM
+        )
+    
+    def _on_avatar_clicked(self) -> None:
+        """Handle avatar widget click event"""
+        import tools.util as util
+        user_email = util.check_login()
+        if not user_email:
+            self._on_login_clicked()
+    
+    def _update_avatar_widget(self) -> None:
+        """Update avatar widget to reflect current login state."""
+        if not self.avatar_widget:
+            return
+        self.avatar_widget._load_avatar()
+        self.avatar_widget.update()

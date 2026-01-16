@@ -4,12 +4,13 @@ Home page (Dashboard) for the application.
 Displays overview, login status, recent tasks, and quick access buttons.
 """
 from typing import Optional
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
+from PySide6.QtCore import Qt, QTimer
 
 from qfluentwidgets import (
     CardWidget,
     PrimaryPushButton,
+    PushButton,
     FluentIcon,
     BodyLabel,
     TitleLabel,
@@ -36,9 +37,12 @@ class HomePage(QWidget):
         """Initialize home page."""
         super().__init__(parent)
         self.app_context = get_app_context()
+        self.check_update_worker: Optional[Any] = None
         self._setup_ui()
         self._connect_signals()
         self._update_login_status()
+        # Check for updates in background after a short delay
+        QTimer.singleShot(2000, self._check_for_updates_background)
     
     def _setup_ui(self) -> None:
         """Setup UI layout."""
@@ -46,10 +50,20 @@ class HomePage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
         
-        # Title section
+        # Title section with update button in top-right
+        title_layout = QHBoxLayout()
         title_label = TitleLabel("QCA Accounting Automation Tool")
         title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(title_label)
+        title_layout.addWidget(title_label)
+        title_layout.addStretch()
+        
+        # Update button in top-right corner
+        self.update_btn = PushButton("Check for Updates", self, FluentIcon.SYNC)
+        self.update_btn.setMinimumHeight(36)
+        self.update_btn.clicked.connect(self._on_check_update_clicked)
+        title_layout.addWidget(self.update_btn)
+        
+        layout.addLayout(title_layout)
         
         # Description
         desc_label = BodyLabel(
@@ -232,4 +246,51 @@ class HomePage(QWidget):
         # This will be connected in MainWindow to show login dialog
         if hasattr(self, '_trigger_login'):
             self._trigger_login()
+    
+    def _check_for_updates_background(self) -> None:
+        """Check for updates in background without blocking UI."""
+        if self.check_update_worker and self.check_update_worker.isRunning():
+            return
+        
+        from workers.update_worker import UpdateCheckWorker
+        
+        self.check_update_worker = UpdateCheckWorker()
+        self.check_update_worker.finished.connect(self._on_update_check_finished)
+        self.check_update_worker.start()
+    
+    def _on_update_check_finished(self, result: dict) -> None:
+        """Handle background update check finished."""
+        success = result.get("success", False)
+        update_available = result.get("update_available", False)
+        
+        if success and update_available:
+            latest_version = result.get("latest_version", "Unknown")
+            local_version = result.get("local_version", "Unknown")
+            release_info = result.get("release_info", {})
+            
+            # Show notification dialog to user
+            reply = QMessageBox.question(
+                self,
+                "Update Available",
+                f"A new version is available!\n\n"
+                f"Current version: {local_version}\n"
+                f"Latest version: {latest_version}\n\n"
+                f"Would you like to update now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                # User chose to update - open update dialog and start download immediately
+                from ui.widgets.update_dialog import UpdateDialog
+                dialog = UpdateDialog(self)
+                # Pre-populate with update info and start download automatically
+                dialog._start_update_immediately(release_info, latest_version, local_version)
+                dialog.exec()
+    
+    def _on_check_update_clicked(self) -> None:
+        """Handle check for updates button click - show update dialog."""
+        from ui.widgets.update_dialog import UpdateDialog
+        dialog = UpdateDialog(self)
+        dialog.exec()
     

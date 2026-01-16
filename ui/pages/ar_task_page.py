@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDate, Qt
 
 from qfluentwidgets import (
+    DatePicker,
     LineEdit,
     BodyLabel,
     PrimaryPushButton,
@@ -71,10 +72,9 @@ class ARTaskPage(BaseTaskPage):
         date_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(date_label)
         
-        self.date_edit = QDateEdit()
+        self.date_edit = DatePicker()
         self.date_edit.setDate(QDate.currentDate())
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.date_edit.dateChanged.connect(lambda date: print(date.toString()))
         # Only allow selecting date from calendar popup (no manual typing)
         try:
             line = self.date_edit.lineEdit()
