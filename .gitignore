@@ -19,3 +19,5 @@ edge_profile/
 ._pycache_/
 __pycache__/
 dist/start.exe
+dist/main.exe
+dist/main.exe

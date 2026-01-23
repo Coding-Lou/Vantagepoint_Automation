@@ -9,6 +9,7 @@ import time
 from domain.adapters.base_adapter import BaseAdapter
 import core.ap as ap_module
 import tools.util as util_module
+import tools.config_manager as config_manager
 
 #region agent log
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -80,25 +81,36 @@ class APAdapter(BaseAdapter):
                 },
             )
             #endregion
-            # Save original config values for restoration
-            original_exclude = util_module.get_config(["AP", "EXCLUDE"])
-            original_from = util_module.get_config(["AP", "FROM"])
-            original_cc = util_module.get_config(["AP", "CC"])
-            original_subject = util_module.get_config(["AP", "SUBJECT"])
-            original_body = util_module.get_config(["AP", "BODY"])
+            # Save original config values for restoration (only if we need to update)
+            original_exclude = None
+            original_from = None
+            original_cc = None
+            original_subject = None
+            original_body = None
             
             try:
-                # Update config if provided
+                # Update config only if provided and different from current config
+                # This avoids unnecessary config updates and errors
                 if exclude_vendors is not None:
-                    util_module.set_config(["AP", "EXCLUDE"], exclude_vendors)
+                    original_exclude = util_module.get_config(["AP", "EXCLUDE"])
+                    if exclude_vendors != original_exclude:
+                        config_manager.update_config_value(["AP", "EXCLUDE"], exclude_vendors)
                 if mail_from:
-                    util_module.set_config(["AP", "FROM"], mail_from)
+                    original_from = util_module.get_config(["AP", "FROM"])
+                    if mail_from != original_from:
+                        config_manager.update_config_value(["AP", "FROM"], mail_from)
                 if mail_cc:
-                    util_module.set_config(["AP", "CC"], mail_cc)
+                    original_cc = util_module.get_config(["AP", "CC"])
+                    if mail_cc != original_cc:
+                        config_manager.update_config_value(["AP", "CC"], mail_cc)
                 if mail_subject:
-                    util_module.set_config(["AP", "SUBJECT"], mail_subject)
+                    original_subject = util_module.get_config(["AP", "SUBJECT"])
+                    if mail_subject != original_subject:
+                        config_manager.update_config_value(["AP", "SUBJECT"], mail_subject)
                 if mail_body:
-                    util_module.set_config(["AP", "BODY"], mail_body)
+                    original_body = util_module.get_config(["AP", "BODY"])
+                    if mail_body != original_body:
+                        config_manager.update_config_value(["AP", "BODY"], mail_body)
                 
                 # Log start
                 if self.log_callback:
@@ -177,12 +189,17 @@ class APAdapter(BaseAdapter):
                 }
                 
             finally:
-                # Restore original config
-                util_module.set_config(["AP", "EXCLUDE"], original_exclude)
-                util_module.set_config(["AP", "FROM"], original_from)
-                util_module.set_config(["AP", "CC"], original_cc)
-                util_module.set_config(["AP", "SUBJECT"], original_subject)
-                util_module.set_config(["AP", "BODY"], original_body)
+                # Restore original config only if we updated it
+                if original_exclude is not None:
+                    config_manager.update_config_value(["AP", "EXCLUDE"], original_exclude)
+                if original_from is not None:
+                    config_manager.update_config_value(["AP", "FROM"], original_from)
+                if original_cc is not None:
+                    config_manager.update_config_value(["AP", "CC"], original_cc)
+                if original_subject is not None:
+                    config_manager.update_config_value(["AP", "SUBJECT"], original_subject)
+                if original_body is not None:
+                    config_manager.update_config_value(["AP", "BODY"], original_body)
                 
         except Exception as e:
             #region agent log

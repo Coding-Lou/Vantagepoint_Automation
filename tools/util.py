@@ -120,19 +120,84 @@ def set_config(key, value):
         print(f"⚠️ {key} updated failed: ", e)
 
 def check_login():
+    from pathlib import Path
+    import json
+    import time
+    DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
+    def _agent_log(hypothesis_id: str, location: str, message: str, data: dict = None):
+        payload = {
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        try:
+            DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+    #region agent log
+    _agent_log("H2", "util.check_login", "check_login() entry", {})
+    #endregion
     try: 
+        token = get_config(["TOKEN"])
+        #region agent log
+        _agent_log("H2", "util.check_login", "check_login() before request", {
+            "has_token": bool(token),
+            "token_length": len(token) if token else 0,
+        })
+        #endregion
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/visionservices.asmx/GetIAccessConfiguration"
-        payload = {"sessionID": get_config(["TOKEN"])}
-        response = requests.post(url, headers = set_headers(), json = payload)
+        payload = {"sessionID": token}
+        headers = set_headers()
+        #region agent log
+        _agent_log("H2", "util.check_login", "check_login() headers from set_headers", {
+            "has_token_in_headers": bool(headers.get("Token")),
+            "has_cookie_in_headers": bool(headers.get("Cookie")),
+        })
+        #endregion
+        response = requests.post(url, headers = headers, json = payload)
+        #region agent log
+        _agent_log("H2", "util.check_login", "check_login() after request", {
+            "status_code": response.status_code,
+            "response_length": len(response.text) if response.text else 0,
+        })
+        #endregion
         cookies = get_config(["COOKIES"])
+        #region agent log
+        _agent_log("H2", "util.check_login", "check_login() cookie check", {
+            "has_cookies": bool(cookies),
+            "has_aspnet": "ASP.NET_SessionId" in (cookies or ""),
+        })
+        #endregion
         if response.status_code == 200 and "ASP.NET_SessionId" in cookies:
             data = response.json()
+            #region agent log
+            _agent_log("H2", "util.check_login", "check_login() success", {
+                "user_email": data.get("d", {}).get("UserInfo", {}).get("EMail") if isinstance(data, dict) else None,
+            })
+            #endregion
             #print("✅ Login Success, User: " + data["d"]["UserInfo"]["EMail"])
             #print()
             return data["d"]["UserInfo"]["EMail"]
         else: 
+            #region agent log
+            _agent_log("H2", "util.check_login", "check_login() failed", {
+                "status_code": response.status_code,
+                "has_aspnet": "ASP.NET_SessionId" in (cookies or ""),
+            })
+            #endregion
             return None
-    except:
+    except Exception as e:
+        #region agent log
+        _agent_log("H2", "util.check_login", "check_login() exception", {
+            "error": str(e),
+        })
+        #endregion
         set_config("TOKEN", "")
         set_config("WWWBEARER", "")
         set_config("COOKIES", "")
@@ -202,9 +267,42 @@ def merge_pdfs():
     print(f"\n🎉 Success the merged pdf file: {output_path}")
 
 def set_headers():
+    from pathlib import Path
+    import json
+    import time
+    DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
+    def _agent_log(hypothesis_id: str, location: str, message: str, data: dict = None):
+        payload = {
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+        }
+        try:
+            DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+    #region agent log
+    _agent_log("H3", "util.set_headers", "set_headers() entry", {})
+    #endregion
     WWWBEARER = get_config(["WWWBEARER"])
     TOKEN = get_config(["TOKEN"])
     COOKIES = get_config(["COOKIES"])
+    #region agent log
+    _agent_log("H3", "util.set_headers", "set_headers() after get_config", {
+        "has_wwwbearer": bool(WWWBEARER),
+        "has_token": bool(TOKEN),
+        "has_cookies": bool(COOKIES),
+        "token_length": len(TOKEN) if TOKEN else 0,
+        "cookie_length": len(COOKIES) if COOKIES else 0,
+        "cookie_has_aspnet": "ASP.NET_SessionId" in (COOKIES or ""),
+    })
+    #endregion
     headers = {
         "accept": "application/json, text/javascript, */*; q=0.01",
         "Content-Type": "application/json; charset=UTF-8",
@@ -212,6 +310,11 @@ def set_headers():
         "Token": TOKEN,
         "Cookie": COOKIES
     }
+    #region agent log
+    _agent_log("H3", "util.set_headers", "set_headers() return", {
+        "headers_keys": list(headers.keys()),
+    })
+    #endregion
     return headers
 
 def init_workdir():

@@ -285,10 +285,50 @@ class BaseTaskPage(QWidget):
             self._append_log("ERROR", f"Parameter validation failed: {error_msg}")
             return
         
-        # Check if task is already running
-        if self.current_worker and self.current_worker.isRunning():
-            self._append_log("WARNING", "Task is already running. Please wait for completion.")
-            return
+        #region agent log
+        _agent_log(
+            "H1",
+            "BaseTaskPage._on_execute_clicked",
+            "Execute clicked - checking existing worker",
+            {"has_worker": bool(self.current_worker), "is_running": self.current_worker.isRunning() if self.current_worker else False},
+        )
+        #endregion
+        
+        # Clean up any existing worker before creating a new one
+        if self.current_worker:
+            #region agent log
+            _agent_log(
+                "H1",
+                "BaseTaskPage._on_execute_clicked",
+                "Existing worker found",
+                {"is_running": self.current_worker.isRunning()},
+            )
+            #endregion
+            if self.current_worker.isRunning():
+                self._append_log("WARNING", "Task is already running. Please wait for completion.")
+                #region agent log
+                _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Worker still running - blocking execution", {})
+                #endregion
+                return
+            else:
+                # Worker exists but not running - clean it up
+                worker = self.current_worker
+                try:
+                    worker.log_signal.disconnect()
+                except Exception:
+                    pass
+                try:
+                    worker.progress_signal.disconnect()
+                except Exception:
+                    pass
+                try:
+                    worker.finished.disconnect()
+                except Exception:
+                    pass
+                self.current_worker = None
+                #region agent log
+                _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Old worker cleaned up", {})
+                #endregion
         
         # Get parameters
         params = self._get_params()
@@ -302,12 +342,19 @@ class BaseTaskPage(QWidget):
         #endregion
         
         # Create worker
+        #region agent log
+        _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Creating new worker", {"task_id": self.task_id})
+        #endregion
         self.current_worker = self._create_worker(params)
         
         # Connect signals
         self.current_worker.log_signal.connect(self._on_log_received)
         self.current_worker.progress_signal.connect(self._on_progress_received)
         self.current_worker.finished.connect(self._on_worker_finished)
+        
+        #region agent log
+        _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Worker created and signals connected", {"task_id": self.task_id})
+        #endregion
         
         # Update UI state
         self._set_execution_enabled(False)
@@ -318,24 +365,68 @@ class BaseTaskPage(QWidget):
         self.task_started.emit(self.task_id)
         
         # Start worker (non-blocking)
+        #region agent log
+        _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Starting worker thread", {"task_id": self.task_id})
+        #endregion
         self.current_worker.start()
+        #region agent log
+        _agent_log("H1", "BaseTaskPage._on_execute_clicked", "Worker thread started", {"task_id": self.task_id, "is_running": self.current_worker.isRunning()})
+        #endregion
     
     @Slot()
     def _on_cancel_clicked(self) -> None:
         """Handle cancel button click."""
-        if self.current_worker and self.current_worker.isRunning():
-            self.current_worker.cancel()
-            self._append_log("INFO", "Cancelling task...")
-            # Request thread termination (forceful if needed)
-            self.current_worker.terminate()
-            # Wait a short time for graceful termination
-            if not self.current_worker.wait(1000):  # Wait up to 1 second
-                # If still running, force terminate
-                self.current_worker.terminate()
-                self.current_worker.wait()
+        #region agent log
+        _agent_log(
+            "H1",
+            "BaseTaskPage._on_cancel_clicked",
+            "Cancel clicked",
+            {"has_worker": bool(self.current_worker), "is_running": self.current_worker.isRunning() if self.current_worker else False},
+        )
+        #endregion
+        if self.current_worker:
+            worker = self.current_worker  # Store reference before clearing
+            was_running = worker.isRunning()
+            
+            if was_running:
+                worker.cancel()
+                self._append_log("INFO", "Cancelling task...")
+                # Disconnect signals BEFORE termination to prevent stale callbacks
+                try:
+                    worker.log_signal.disconnect()
+                except Exception:
+                    pass
+                try:
+                    worker.progress_signal.disconnect()
+                except Exception:
+                    pass
+                try:
+                    worker.finished.disconnect()
+                except Exception:
+                    pass
+                
+                # Request thread termination (forceful if needed)
+                worker.terminate()
+                # Wait for thread to finish (with timeout)
+                if not worker.wait(2000):  # Wait up to 2 seconds
+                    # If still running, force terminate again
+                    worker.terminate()
+                    worker.wait(1000)  # Final wait
+            
+            # Clear worker reference immediately after disconnecting
+            self.current_worker = None
+            #region agent log
+            _agent_log("H1", "BaseTaskPage._on_cancel_clicked", "Worker cleaned up", {"was_running": was_running})
+            #endregion
+            
             # Update UI state immediately
             self._set_execution_enabled(True)
             self._append_log("INFO", "Task cancelled")
+            
+            # Emit task_failed signal to notify MainWindow to re-enable all pages
+            # This ensures that other pages (AR, etc.) are also re-enabled after cancellation
+            if was_running:
+                self.task_failed.emit(self.task_id, "Task was cancelled by user")
     
     @Slot(dict)
     def _on_worker_finished(self, result: Dict[str, Any]) -> None:
@@ -345,6 +436,39 @@ class BaseTaskPage(QWidget):
         Args:
             result: Result dictionary
         """
+        #region agent log
+        _agent_log(
+            "H1",
+            "BaseTaskPage._on_worker_finished",
+            "Worker finished signal received",
+            {"has_worker": bool(self.current_worker), "success": bool(result.get("success"))},
+        )
+        #endregion
+        # Only process if this is the current worker (ignore stale signals from cancelled workers)
+        if not self.current_worker:
+            #region agent log
+            _agent_log("H1", "BaseTaskPage._on_worker_finished", "Ignoring stale signal - no current worker", {})
+            #endregion
+            return
+        
+        # Store worker reference before clearing
+        worker = self.current_worker
+        self.current_worker = None
+        
+        # Disconnect signals to prevent any further callbacks
+        try:
+            worker.log_signal.disconnect()
+        except Exception:
+            pass
+        try:
+            worker.progress_signal.disconnect()
+        except Exception:
+            pass
+        try:
+            worker.finished.disconnect()
+        except Exception:
+            pass
+        
         # Update UI state
         self._set_execution_enabled(True)
         
@@ -353,8 +477,14 @@ class BaseTaskPage(QWidget):
             self.task_finished.emit(self.task_id, result)
         else:
             error_msg = result.get("message", "Unknown error")
-            self._append_log("ERROR", f"Task failed: {error_msg}")
+            # Don't log error for cancelled tasks
+            if "cancelled" not in error_msg.lower():
+                self._append_log("ERROR", f"Task failed: {error_msg}")
             self.task_failed.emit(self.task_id, error_msg)
+        
+        #region agent log
+        _agent_log("H1", "BaseTaskPage._on_worker_finished", "Worker finished processed and cleaned up", {})
+        #endregion
     
     @Slot(str, str)
     def _on_log_received(self, level: str, message: str) -> None:

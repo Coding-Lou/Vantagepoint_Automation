@@ -70,6 +70,15 @@ class ARWorker(BaseWorker):
                     "message": "Task was cancelled"
                 }
             
+            #region agent log
+            _agent_log_local("Before adapter.execute", {
+                "statement_date": self.params.get("statement_date"),
+                "has_mail_from": bool(self.params.get("mail_from")),
+                "has_mail_cc": bool(self.params.get("mail_cc")),
+                "has_mail_subject": bool(self.params.get("mail_subject")),
+                "has_mail_body": bool(self.params.get("mail_body")),
+            })
+            #endregion
             result = self.adapter.execute(
                 statement_date=self.params.get("statement_date"),
                 mail_from=self.params.get("mail_from"),
@@ -77,6 +86,12 @@ class ARWorker(BaseWorker):
                 mail_subject=self.params.get("mail_subject"),
                 mail_body=self.params.get("mail_body")
             )
+            #region agent log
+            _agent_log_local("After adapter.execute", {
+                "success": bool(result.get("success")),
+                "has_message": bool(result.get("message")),
+            })
+            #endregion
             #region agent log
             _agent_log_local("ARWorker execute result", {"success": bool(result.get("success"))})
             #endregion

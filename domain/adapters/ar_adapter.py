@@ -9,6 +9,7 @@ import time
 from domain.adapters.base_adapter import BaseAdapter
 import core.ar as ar_module
 import tools.util as util_module
+import tools.config_manager as config_manager
 
 #region agent log
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -53,6 +54,21 @@ class ARAdapter(BaseAdapter):
         mail_subject: Optional[str] = None,
         mail_body: Optional[str] = None
     ) -> Dict[str, Any]:
+        #region agent log
+        _agent_log(
+            "H1",
+            "ARAdapter.execute",
+            "ARAdapter.execute entry",
+            {
+                "has_statement_date": bool(statement_date),
+                "statement_date": statement_date,
+                "has_mail_from": bool(mail_from),
+                "has_mail_cc": bool(mail_cc),
+                "has_mail_subject": bool(mail_subject),
+                "has_mail_body": bool(mail_body),
+            },
+        )
+        #endregion
         """
         Execute AR statement generation task.
         
@@ -77,22 +93,103 @@ class ARAdapter(BaseAdapter):
                 },
             )
             #endregion
-            # Save original config values for restoration
-            original_from = util_module.get_config(["AR", "FROM"])
-            original_cc = util_module.get_config(["AR", "CC"])
-            original_subject = util_module.get_config(["AR", "SUBJECT"])
-            original_body = util_module.get_config(["AR", "BODY"])
+            # Save original config values for restoration (only if we need to update)
+            original_from = None
+            original_cc = None
+            original_subject = None
+            original_body = None
             
             try:
-                # Update config if provided
+                #region agent log
+                _agent_log(
+                    "H1",
+                    "ARAdapter.execute",
+                    "Before config update",
+                    {
+                        "has_mail_from": bool(mail_from),
+                        "has_mail_cc": bool(mail_cc),
+                        "has_mail_subject": bool(mail_subject),
+                        "has_mail_body": bool(mail_body),
+                    },
+                )
+                #endregion
+                # Update config only if provided and different from current config
+                # This avoids unnecessary config updates and errors
                 if mail_from:
-                    util_module.set_config(["AR", "FROM"], mail_from)
+                    #region agent log
+                    _agent_log("H2", "ARAdapter.execute", "Getting original FROM", {})
+                    #endregion
+                    original_from = util_module.get_config(["AR", "FROM"])
+                    #region agent log
+                    _agent_log(
+                        "H2",
+                        "ARAdapter.execute",
+                        "Got original FROM",
+                        {"original_from": str(original_from)[:50] if original_from else None, "mail_from": str(mail_from)[:50]},
+                    )
+                    #endregion
+                    if mail_from != original_from:
+                        #region agent log
+                        _agent_log("H2", "ARAdapter.execute", "Updating FROM config", {})
+                        #endregion
+                        config_manager.update_config_value(["AR", "FROM"], mail_from)
                 if mail_cc:
-                    util_module.set_config(["AR", "CC"], mail_cc)
+                    #region agent log
+                    _agent_log("H3", "ARAdapter.execute", "Getting original CC", {})
+                    #endregion
+                    original_cc = util_module.get_config(["AR", "CC"])
+                    #region agent log
+                    _agent_log(
+                        "H3",
+                        "ARAdapter.execute",
+                        "Got original CC",
+                        {"original_cc": str(original_cc)[:50] if original_cc else None, "mail_cc": str(mail_cc)[:50]},
+                    )
+                    #endregion
+                    if mail_cc != original_cc:
+                        #region agent log
+                        _agent_log("H3", "ARAdapter.execute", "Updating CC config", {})
+                        #endregion
+                        config_manager.update_config_value(["AR", "CC"], mail_cc)
                 if mail_subject:
-                    util_module.set_config(["AR", "SUBJECT"], mail_subject)
+                    #region agent log
+                    _agent_log("H4", "ARAdapter.execute", "Getting original SUBJECT", {})
+                    #endregion
+                    original_subject = util_module.get_config(["AR", "SUBJECT"])
+                    #region agent log
+                    _agent_log(
+                        "H4",
+                        "ARAdapter.execute",
+                        "Got original SUBJECT",
+                        {"original_subject": str(original_subject)[:50] if original_subject else None, "mail_subject": str(mail_subject)[:50]},
+                    )
+                    #endregion
+                    if mail_subject != original_subject:
+                        #region agent log
+                        _agent_log("H4", "ARAdapter.execute", "Updating SUBJECT config", {})
+                        #endregion
+                        config_manager.update_config_value(["AR", "SUBJECT"], mail_subject)
                 if mail_body:
-                    util_module.set_config(["AR", "BODY"], mail_body)
+                    #region agent log
+                    _agent_log("H5", "ARAdapter.execute", "Getting original BODY", {})
+                    #endregion
+                    original_body = util_module.get_config(["AR", "BODY"])
+                    #region agent log
+                    _agent_log(
+                        "H5",
+                        "ARAdapter.execute",
+                        "Got original BODY",
+                        {"original_body_len": len(str(original_body)) if original_body else 0, "mail_body_len": len(str(mail_body))},
+                    )
+                    #endregion
+                    if mail_body != original_body:
+                        #region agent log
+                        _agent_log("H5", "ARAdapter.execute", "Updating BODY config", {})
+                        #endregion
+                        config_manager.update_config_value(["AR", "BODY"], mail_body)
+                #region agent log
+                _agent_log("H1", "ARAdapter.execute", "After config update", {})
+                #endregion
                 
                 # Log start
                 if self.log_callback:
@@ -169,19 +266,28 @@ class ARAdapter(BaseAdapter):
                 }
                 
             finally:
-                # Restore original config
-                util_module.set_config(["AR", "FROM"], original_from)
-                util_module.set_config(["AR", "CC"], original_cc)
-                util_module.set_config(["AR", "SUBJECT"], original_subject)
-                util_module.set_config(["AR", "BODY"], original_body)
+                # Restore original config only if we updated it
+                if original_from is not None:
+                    config_manager.update_config_value(["AR", "FROM"], original_from)
+                if original_cc is not None:
+                    config_manager.update_config_value(["AR", "CC"], original_cc)
+                if original_subject is not None:
+                    config_manager.update_config_value(["AR", "SUBJECT"], original_subject)
+                if original_body is not None:
+                    config_manager.update_config_value(["AR", "BODY"], original_body)
                 
         except Exception as e:
             #region agent log
+            import traceback
             _agent_log(
                 "H1",
                 "ARAdapter.execute",
                 "AR adapter raised exception",
-                {"error": str(e)},
+                {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "traceback": traceback.format_exc()[:500],
+                },
             )
             #endregion
             if self.log_callback:
