@@ -3,8 +3,6 @@ Adapter for Project Status task.
 """
 from typing import Dict, Any, Optional
 from pathlib import Path
-import sys
-from io import StringIO
 import json
 import time
 

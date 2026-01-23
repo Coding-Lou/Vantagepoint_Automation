@@ -3,7 +3,6 @@ Main window for QCA Accounting Automation Tool.
 """
 from typing import Dict, Optional, Any
 from pathlib import Path
-import inspect
 import json
 import time
 
@@ -45,7 +44,7 @@ except Exception as e:
 #endregion
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QStackedWidget, QLabel, QStatusBar, QFrame
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
 )
 #region agent log
 try:
@@ -55,10 +54,8 @@ except Exception:
     pass
 #endregion
 
-from PySide6.QtCore import Signal, Slot
-from PySide6.QtCore import Qt, QRect
-from PySide6.QtGui import QFont, QIcon, QPainter, QImage, QBrush, QColor
-from pathlib import Path
+from PySide6.QtCore import Signal, Slot, Qt, QRect
+from PySide6.QtGui import QFont, QIcon, QPainter, QBrush, QColor
 
 #region agent log
 try:
@@ -116,6 +113,7 @@ from ui.pages.home_page import HomePage
 from ui.pages.ap_task_page import APTaskPage
 from ui.pages.ar_task_page import ARTaskPage
 from ui.pages.project_status_task_page import ProjectStatusTaskPage
+from ui.pages.statement_check_task_page import StatementCheckTaskPage
 from ui.pages.base_task_page import BaseTaskPage
 from ui.pages.scheduled_tasks_page import ScheduledTasksPage
 from ui.services.app_context import get_app_context
@@ -140,12 +138,38 @@ class CustomAvatarWidget(NavigationWidget):
         super().__init__(isSelectable=False, parent=parent)
         self.avatar_image = None
         self.initials = ""
+        self.user_email = None
+        # Get AppContext to listen for login state changes
+        from ui.services.app_context import get_app_context
+        self.app_context = get_app_context()
+        self.app_context.login_state_changed.connect(self._on_login_state_changed)
+        self.app_context.user_info_changed.connect(self._on_user_info_changed)
         self._load_avatar()
     
+    def _on_login_state_changed(self, is_logged_in: bool) -> None:
+        """Handle login state changed signal."""
+        self._load_avatar()
+        self.update()
+    
+    def _on_user_info_changed(self, user_info: dict) -> None:
+        """Handle user info changed signal."""
+        self._load_avatar()
+        self.update()
+    
     def _load_avatar(self):
-        """Load avatar image or generate initials"""
-        import tools.util as util
-        user_email = util.check_login()
+        """Load avatar image or generate initials from AppContext."""
+        # Get user email from AppContext first, fallback to direct check
+        user_email = self.app_context.user_email
+        if not user_email:
+            # Fallback: check directly if AppContext doesn't have it yet
+            import tools.util as util
+            user_email = util.check_login()
+            # Update AppContext if we got email from direct check
+            if user_email:
+                user_info = {"EMail": user_email, "email": user_email}
+                self.app_context.set_login_state(True, user_info)
+        
+        self.user_email = user_email
         
         if user_email:
             # Extract initials from email
@@ -195,11 +219,9 @@ class CustomAvatarWidget(NavigationWidget):
         painter.drawText(avatar_rect, Qt.AlignCenter, self.initials)
         
         # Draw name text (email prefix)
-        if not self.isCompacted:    
-            import tools.util as util
-            user_email = util.check_login()
-            if user_email:
-                email_prefix = user_email.split("@")[0]
+        if not self.isCompacted:
+            if self.user_email:
+                email_prefix = self.user_email.split("@")[0]
                 painter.setPen(Qt.white if isDarkTheme() else Qt.black)
                 font = QFont('Segoe UI')
                 font.setPixelSize(14)
@@ -247,18 +269,21 @@ class CustomTitleBar(TitleBar):
         self.iconLabel.setPixmap(QIcon(icon).pixmap(18, 18))
 
 
+# Import SettingsPage
+from ui.widgets.settings_page import SettingsPage
+
 class SettingsWidget(QFrame):
-    """Empty settings widget"""
+    """Settings widget wrapper"""
     
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setObjectName("settings")
-        self.label = QLabel("Settings", self)
-        self.label.setAlignment(Qt.AlignCenter)
-        self.hBoxLayout = QHBoxLayout(self)
-        self.hBoxLayout.addWidget(self.label, 1, Qt.AlignCenter)
-        # Leave some space for title bar
-        self.hBoxLayout.setContentsMargins(0, 32, 0, 0)
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create settings page
+        self.settings_page = SettingsPage(self)
+        self.layout.addWidget(self.settings_page)
 
 
 class MainWindow(FluentWindow):
@@ -438,6 +463,7 @@ class MainWindow(FluentWindow):
         #region agent log
         try:
             import qfluentwidgets as qfw
+            import inspect
             sig = str(inspect.signature(self.addSubInterface))
             _agent_log(
                 "H7",
@@ -506,6 +532,7 @@ class MainWindow(FluentWindow):
         self.task_pages["ap"] = APTaskPage()
         self.task_pages["ar"] = ARTaskPage()
         self.task_pages["project_status"] = ProjectStatusTaskPage()
+        self.task_pages["statement_check"] = StatementCheckTaskPage()
 
         # Add task pages to navigation and stacked widget
         for task_id, page in self.task_pages.items():
@@ -526,6 +553,7 @@ class MainWindow(FluentWindow):
                     "ap": load_icon("ap"),
                     "ar": load_icon("ar"),
                     "project_status": load_icon("project_status"),
+                    "statement_check": load_icon("statement_check"),
                 }
                 icon = icon_map.get(task_id, FluentIcon.DOCUMENT)
                 

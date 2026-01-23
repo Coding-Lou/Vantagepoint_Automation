@@ -19,7 +19,7 @@ class APWorker(BaseWorker):
         Args:
             params: Task parameters dictionary
         """
-        super().__init__("ap.generate_remittance", params)
+        super().__init__("ap.generate_remittance", params, auto_login_enabled=True)
         self.adapter = APAdapter(
             log_callback=self.log_signal.emit,
             progress_callback=self.progress_signal.emit

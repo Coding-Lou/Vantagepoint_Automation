@@ -11,6 +11,8 @@ from PySide6.QtCore import QThread, Signal
 
 from ui.utils.log_redirector import LogRedirector
 import tools.util as util_module
+import tools.login as login_module
+from ui.services.app_context import get_app_context
 
 #region agent log
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -53,18 +55,20 @@ class BaseWorker(QThread):
     progress_signal = Signal(int, int, str)  # current, total, message
     finished = Signal(dict)  # result dictionary
     
-    def __init__(self, task_id: str, params: Dict[str, Any]):
+    def __init__(self, task_id: str, params: Dict[str, Any], auto_login_enabled: bool = False):
         """
         Initialize worker.
         
         Args:
             task_id: Task identifier
             params: Task parameters dictionary
+            auto_login_enabled: Whether to automatically attempt login if not logged in (default: False)
         """
         super().__init__()
         self.task_id = task_id
         self.params = params
         self.is_cancelled = False
+        self.auto_login_enabled = auto_login_enabled
         self.log_redirector: Optional[LogRedirector] = None
         self.old_stdout: Optional[Any] = None
         self.old_stderr: Optional[Any] = None
@@ -103,14 +107,26 @@ class BaseWorker(QThread):
                     "H2",
                     "BaseWorker.run",
                     "Login check failed",
-                    {"task_id": self.task_id},
+                    {"task_id": self.task_id, "auto_login_enabled": self.auto_login_enabled},
                 )
                 #endregion
-                self.finished.emit({
-                    "success": False,
-                    "message": "Login status is invalid. Please login first."
-                })
-                return
+                
+                # Attempt auto-login if enabled
+                if self.auto_login_enabled:
+                    self.log_signal.emit("INFO", "Not logged in. Attempting automatic login...")
+                    if not self._auto_login():
+                        self.finished.emit({
+                            "success": False,
+                            "message": "Login status is invalid and automatic login failed. Please login manually."
+                        })
+                        return
+                    self.log_signal.emit("SUCCESS", "Automatic login successful. Proceeding with task execution...")
+                else:
+                    self.finished.emit({
+                        "success": False,
+                        "message": "Login status is invalid. Please login first."
+                    })
+                    return
             
             # Check if cancelled before execution
             if self.is_cancelled:
@@ -176,6 +192,65 @@ class BaseWorker(QThread):
         try:
             return util_module.check_login()
         except Exception:
+            return False
+    
+    def _auto_login(self) -> bool:
+        """
+        Attempt automatic login.
+        
+        Returns:
+            True if login successful, False otherwise
+        """
+        try:
+            #region agent log
+            _agent_log(
+                "H2",
+                "BaseWorker._auto_login",
+                "Auto-login attempt started",
+                {"task_id": self.task_id},
+            )
+            #endregion
+            
+            self.log_signal.emit("INFO", "Opening browser for authentication...")
+            # Call SSO login function
+            login_module.sso_login()
+            
+            # Verify login was successful
+            self.log_signal.emit("INFO", "Verifying login status...")
+            user_email = util_module.check_login()
+            is_logged_in = bool(user_email)
+            
+            #region agent log
+            _agent_log(
+                "H2",
+                "BaseWorker._auto_login",
+                "Auto-login attempt completed",
+                {"task_id": self.task_id, "success": is_logged_in, "user_email": user_email if user_email else None},
+            )
+            #endregion
+            
+            # Update AppContext if login successful
+            if is_logged_in and user_email:
+                try:
+                    app_context = get_app_context()
+                    user_info = {"EMail": user_email, "email": user_email}
+                    app_context.set_login_state(True, user_info)
+                    self.log_signal.emit("INFO", f"Login state updated in application context")
+                except Exception as e:
+                    # Log but don't fail the login process
+                    self.log_signal.emit("WARNING", f"Failed to update application context: {str(e)}")
+            
+            return is_logged_in
+        except Exception as e:
+            #region agent log
+            _agent_log(
+                "H2",
+                "BaseWorker._auto_login",
+                "Auto-login exception",
+                {"task_id": self.task_id, "error": str(e)},
+            )
+            #endregion
+            self.log_signal.emit("ERROR", f"Automatic login failed: {str(e)}")
             return False
     
     def execute(self) -> Dict[str, Any]:

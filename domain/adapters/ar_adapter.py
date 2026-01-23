@@ -3,8 +3,6 @@ Adapter for AR (Accounts Receivable) task.
 """
 from typing import Dict, Any, Optional
 from pathlib import Path
-import sys
-from io import StringIO
 import json
 import time
 

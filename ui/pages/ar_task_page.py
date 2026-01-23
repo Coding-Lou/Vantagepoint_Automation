@@ -6,14 +6,12 @@ Task: Generate AR statements with email configuration.
 from typing import Dict, Any, Tuple, Optional
 
 from PySide6.QtWidgets import (
-    QDateEdit,
-    QLineEdit,
     QTextEdit,
-    QLabel,
     QFormLayout,
     QHBoxLayout,
+    QMessageBox,
 )
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, Qt, Slot
 
 from qfluentwidgets import (
     DatePicker,
@@ -167,13 +165,13 @@ class ARTaskPage(BaseTaskPage):
     
     def _validate_params(self) -> Tuple[bool, str]:
         """Validate task parameters."""
-        if not self.date_edit.date().isValid():
+        if not self.date_edit.date.isValid():
             return False, "Please select a valid statement date"
         return True, ""
     
     def _get_params(self) -> Dict[str, Any]:
         """Get task parameters from UI."""
-        date = self.date_edit.date().toString("yyyy-MM-dd")
+        date = self.date_edit.date.toString("yyyy-MM-dd")
         
         return {
             "statement_date": date,
@@ -186,6 +184,25 @@ class ARTaskPage(BaseTaskPage):
     def _create_worker(self, params: Dict[str, Any]) -> ARWorker:
         """Create AR worker."""
         return ARWorker(params)
+    
+    @Slot(dict)
+    def _on_worker_finished(self, result: Dict[str, Any]) -> None:
+        """
+        Handle worker finished signal with completion dialog.
+        
+        Args:
+            result: Result dictionary
+        """
+        # Call parent implementation first
+        super()._on_worker_finished(result)
+        
+        # Show completion dialog if task succeeded
+        if result.get("success"):
+            QMessageBox.information(
+                self,
+                "Task Completed",
+                "AR Statement task has been completed successfully."
+            )
     
     def _on_edit_email_clicked(self) -> None:
         """Handle Edit button click - enable editing of email fields."""

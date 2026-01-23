@@ -52,32 +52,23 @@ def get_runtime_dir() -> Path:
     return Path(__file__).resolve().parent
 
 def get_config(klist):
-    """Get config value. In frozen mode, uses exe directory for persistence."""
+    """Get config value. Config file is in the main directory (same level as main.py or exe)."""
     base_dir = get_runtime_dir()
     
-    # In frozen mode (packaged exe), config should be in exe directory
-    # This allows config to be editable and persistent
-    if getattr(sys, "frozen", False):
-        # Try exe directory/config/config.json first (for persistence)
-        config_path = base_dir / "config" / "config.json"
-        if not config_path.exists():
-            # If not found, try to copy from bundled resource (one-time setup)
-            try:
-                if hasattr(sys, '_MEIPASS'):
-                    # PyInstaller temporary folder
-                    bundled_config = Path(sys._MEIPASS) / "config" / "config.json"
-                    if bundled_config.exists():
-                        # Create config directory in exe folder
-                        (base_dir / "config").mkdir(exist_ok=True)
-                        import shutil
-                        shutil.copy2(bundled_config, config_path)
-            except Exception:
-                pass
-    else:
-        # Development mode: use standard paths
-        config_path = (base_dir / "config.json"
-            if (base_dir / "config.json").exists()
-            else base_dir.parent / "config" / "config.json")
+    # Config is in the main directory (same level as main.py or exe)
+    config_path = base_dir / "config.json"
+    
+    # In frozen mode, if config doesn't exist, try to copy from bundled resource
+    if getattr(sys, "frozen", False) and not config_path.exists():
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                # PyInstaller temporary folder
+                bundled_config = Path(sys._MEIPASS) / "config.json"
+                if bundled_config.exists():
+                    import shutil
+                    shutil.copy2(bundled_config, config_path)
+        except Exception:
+            pass
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -97,29 +88,22 @@ def get_config(klist):
         return None
 
 def set_config(key, value):
-    """Set config value. In frozen mode, uses exe directory for persistence."""
+    """Set config value. Config file is in the main directory (same level as main.py or exe)."""
     base_dir = get_runtime_dir()
     
-    # In frozen mode (packaged exe), config should be in exe directory
-    if getattr(sys, "frozen", False):
-        config_path = base_dir / "config" / "config.json"
-        # Ensure config directory exists
-        config_path.parent.mkdir(exist_ok=True)
-        # If config doesn't exist, try to copy from bundled resource
-        if not config_path.exists():
-            try:
-                if hasattr(sys, '_MEIPASS'):
-                    bundled_config = Path(sys._MEIPASS) / "config" / "config.json"
-                    if bundled_config.exists():
-                        import shutil
-                        shutil.copy2(bundled_config, config_path)
-            except Exception:
-                pass
-    else:
-        # Development mode: use standard paths
-        config_path = (base_dir / "config.json"
-            if (base_dir / "config.json").exists()
-            else base_dir.parent / "config" / "config.json")
+    # Config is in the main directory (same level as main.py or exe)
+    config_path = base_dir / "config.json"
+    
+    # In frozen mode, if config doesn't exist, try to copy from bundled resource
+    if getattr(sys, "frozen", False) and not config_path.exists():
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                bundled_config = Path(sys._MEIPASS) / "config.json"
+                if bundled_config.exists():
+                    import shutil
+                    shutil.copy2(bundled_config, config_path)
+        except Exception:
+            pass
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)

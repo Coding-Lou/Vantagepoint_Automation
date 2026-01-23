@@ -19,7 +19,7 @@ class ProjectStatusWorker(BaseWorker):
         Args:
             params: Task parameters dictionary
         """
-        super().__init__("project_status.generate_report", params)
+        super().__init__("project_status.generate_report", params, auto_login_enabled=True)
         self.adapter = ProjectStatusAdapter(
             log_callback=self.log_signal.emit,
             progress_callback=self.progress_signal.emit

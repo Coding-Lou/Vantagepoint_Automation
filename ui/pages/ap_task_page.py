@@ -6,34 +6,30 @@ Task: Generate AP remittance advice with email configuration.
 from typing import Dict, Any, Tuple, Optional
 
 from PySide6.QtWidgets import (
-    QDateEdit,
     QLineEdit,
     QTextEdit,
     QLabel,
     QFormLayout,
     QHBoxLayout,
+    QMessageBox,
 )
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, Qt, Slot
 
 from qfluentwidgets import (
     DatePicker,
     LineEdit,
-    PlainTextEdit,
-    ListWidget,
     BodyLabel,
     CardWidget,
-    VBoxLayout,
     PrimaryPushButton,
     PushButton,
     FluentIcon,
-    ExpandGroupSettingCard,
-    ExpandLayout,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
 from workers.ap_worker import APWorker
 import tools.util as util_module
 import tools.config_manager as config_manager
+import json
 
 
 class APTaskPage(BaseTaskPage):
@@ -80,6 +76,29 @@ class APTaskPage(BaseTaskPage):
         
         self.date_edit = DatePicker()
         self.date_edit.setDate(QDate.currentDate())
+        #region agent log
+        try:
+            log_path = r"c:\cursor\.cursor\debug.log"
+            date_attr = getattr(self.date_edit, 'date', None)
+            date_type = type(date_attr).__name__ if date_attr is not None else 'None'
+            is_callable = callable(date_attr)
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "run1",
+                    "hypothesisId": "C",
+                    "location": "ap_task_page.py:82",
+                    "message": "After DatePicker initialization and setDate",
+                    "data": {
+                        "date_type": date_type,
+                        "is_callable": is_callable,
+                        "date_repr": str(date_attr)[:100] if date_attr is not None else None
+                    },
+                    "timestamp": int(__import__('time').time() * 1000)
+                }) + '\n')
+        except Exception as e:
+            pass
+        #endregion
         self.date_edit.dateChanged.connect(lambda date: print(date.toString()))
         # Only allow selecting date from calendar popup (no manual typing)
         # NOTE: Don't call QDateEdit.setReadOnly(True) here; in some Qt builds it
@@ -175,13 +194,63 @@ class APTaskPage(BaseTaskPage):
     
     def _validate_params(self) -> Tuple[bool, str]:
         """Validate task parameters."""
-        if not self.date_edit.date().isValid():
+        #region agent log
+        try:
+            log_path = r"c:\cursor\.cursor\debug.log"
+            date_attr = getattr(self.date_edit, 'date', None)
+            date_type = type(date_attr).__name__ if date_attr is not None else 'None'
+            is_callable = callable(date_attr)
+            is_valid = date_attr.isValid() if date_attr is not None else False
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "post-fix",
+                    "hypothesisId": "A",
+                    "location": "ap_task_page.py:178",
+                    "message": "Checking date_edit.date attribute (post-fix)",
+                    "data": {
+                        "date_type": date_type,
+                        "is_callable": is_callable,
+                        "is_valid": is_valid,
+                        "date_repr": str(date_attr)[:100] if date_attr is not None else None
+                    },
+                    "timestamp": int(__import__('time').time() * 1000)
+                }) + '\n')
+        except Exception as e:
+            pass
+        #endregion
+        if not self.date_edit.date.isValid():
             return False, "Please select a valid remittance date"
         return True, ""
     
     def _get_params(self) -> Dict[str, Any]:
         """Get task parameters from UI."""
-        date = self.date_edit.date().toString("yyyy-MM-dd")
+        #region agent log
+        try:
+            log_path = r"c:\cursor\.cursor\debug.log"
+            date_attr = getattr(self.date_edit, 'date', None)
+            date_type = type(date_attr).__name__ if date_attr is not None else 'None'
+            is_callable = callable(date_attr)
+            date_str = date_attr.toString("yyyy-MM-dd") if date_attr is not None else None
+            with open(log_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    "sessionId": "debug-session",
+                    "runId": "post-fix",
+                    "hypothesisId": "B",
+                    "location": "ap_task_page.py:184",
+                    "message": "Getting date in _get_params (post-fix)",
+                    "data": {
+                        "date_type": date_type,
+                        "is_callable": is_callable,
+                        "date_str": date_str,
+                        "date_repr": str(date_attr)[:100] if date_attr is not None else None
+                    },
+                    "timestamp": int(__import__('time').time() * 1000)
+                }) + '\n')
+        except Exception as e:
+            pass
+        #endregion
+        date = self.date_edit.date.toString("yyyy-MM-dd")
         
         return {
             "remittance_date": date,
@@ -195,6 +264,25 @@ class APTaskPage(BaseTaskPage):
     def _create_worker(self, params: Dict[str, Any]) -> APWorker:
         """Create AP worker."""
         return APWorker(params)
+    
+    @Slot(dict)
+    def _on_worker_finished(self, result: Dict[str, Any]) -> None:
+        """
+        Handle worker finished signal with completion dialog.
+        
+        Args:
+            result: Result dictionary
+        """
+        # Call parent implementation first
+        super()._on_worker_finished(result)
+        
+        # Show completion dialog if task succeeded
+        if result.get("success"):
+            QMessageBox.information(
+                self,
+                "Task Completed",
+                "AP Remittance task has been completed successfully."
+            )
     
     def _on_edit_email_clicked(self) -> None:
         """Handle Edit button click - enable editing of email fields."""

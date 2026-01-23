@@ -8,20 +8,19 @@ from pathlib import Path
 # =========================
 
 def get_runtime_dir() -> Path:
+    """Get the main directory (where main.py or exe is located)."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
+    # In development mode, return parent of tools directory (main directory)
+    return Path(__file__).resolve().parent.parent
 
 BASE_DIR = get_runtime_dir()
 
-TASKS_FILE = (
-    BASE_DIR / "config.json"
-    if (BASE_DIR / "tasks.json").exists()
-    else BASE_DIR.parent / "config" / "config.json"
-)
+# Config file is in the main directory (same level as main.py or exe)
+TASKS_FILE = BASE_DIR / "config.json"
 
 if not TASKS_FILE.exists():
-    raise FileNotFoundError(f"tasks.json not found at {TASKS_FILE}")
+    raise FileNotFoundError(f"config.json not found at {TASKS_FILE}")
 
 # =========================
 # Schedule command build

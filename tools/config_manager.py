@@ -30,36 +30,28 @@ def get_runtime_dir() -> Path:
 def get_config_path() -> Path:
     """
     Get the path to config.json file.
-    In frozen mode (packaged exe), uses exe directory for persistence.
+    Config file is located in the main directory (same level as main.py or exe).
     
     Returns:
         Path to config.json file
     """
     base_dir = get_runtime_dir()
     
-    # In frozen mode (packaged exe), config should be in exe directory
-    if getattr(sys, "frozen", False):
-        config_path = base_dir / "config" / "config.json"
-        # Ensure config directory exists
-        config_path.parent.mkdir(exist_ok=True)
-        # If config doesn't exist, try to copy from bundled resource (one-time setup)
-        if not config_path.exists():
-            try:
-                if hasattr(sys, '_MEIPASS'):
-                    # PyInstaller temporary folder
-                    bundled_config = Path(sys._MEIPASS) / "config" / "config.json"
-                    if bundled_config.exists():
-                        import shutil
-                        shutil.copy2(bundled_config, config_path)
-            except Exception:
-                pass
-    else:
-        # Development mode: use standard paths
-        config_path = (
-            base_dir / "config.json"
-            if (base_dir / "config.json").exists()
-            else base_dir.parent / "config" / "config.json"
-        )
+    # Config is in the main directory (same level as main.py or exe)
+    config_path = base_dir / "config.json"
+    
+    # In frozen mode, if config doesn't exist, try to copy from bundled resource
+    if getattr(sys, "frozen", False) and not config_path.exists():
+        try:
+            if hasattr(sys, '_MEIPASS'):
+                # PyInstaller temporary folder
+                bundled_config = Path(sys._MEIPASS) / "config.json"
+                if bundled_config.exists():
+                    import shutil
+                    shutil.copy2(bundled_config, config_path)
+        except Exception:
+            pass
+    
     return config_path
 
 

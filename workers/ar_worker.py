@@ -19,7 +19,7 @@ class ARWorker(BaseWorker):
         Args:
             params: Task parameters dictionary
         """
-        super().__init__("ar.generate_statements", params)
+        super().__init__("ar.generate_statements", params, auto_login_enabled=True)
         self.adapter = ARAdapter(
             log_callback=self.log_signal.emit,
             progress_callback=self.progress_signal.emit

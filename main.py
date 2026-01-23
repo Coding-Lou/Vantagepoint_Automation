@@ -17,8 +17,7 @@ from typing import Optional
 from tools.runtime_logger import RuntimeLogger
 import tools.util as util
 import tools.login as login
-import tools.schedule_task as schedule_task
-# Core modules are imported lazily in run_task_by_flag to avoid import errors
+# Core modules and schedule_task are imported lazily in run_task_by_flag to avoid import errors
 
 # =========================
 # Set up logger
@@ -109,6 +108,7 @@ def run_task_by_flag(args) -> bool:
         import core.on_call as on_call
         on_call.run_oncall_task(vendorName=args.name)
     elif args.init_schedule:
+        import tools.schedule_task as schedule_task
         schedule_task.main()
     else:
         return False

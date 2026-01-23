@@ -3,11 +3,9 @@ Project Status task page with modern Fluent Design.
 
 Task: Generate project status reports.
 """
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple
 
 from PySide6.QtWidgets import (
-    QLineEdit,
-    QLabel,
     QFormLayout,
     QHBoxLayout,
 )

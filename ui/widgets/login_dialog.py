@@ -3,8 +3,7 @@ Login dialog with modern Fluent Design.
 
 Provides SSO login interface with progress indication.
 """
-from typing import Optional
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QDialog
+from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout, QDialog
 from PySide6.QtCore import Qt, Signal
 
 from qfluentwidgets import (
