@@ -83,12 +83,7 @@ class ProjectStatusAdapter(BaseAdapter):
                 ps_module.HEADERS = util_module.set_headers()
                 if self.log_callback:
                     self.log_callback("INFO", "Updated authentication headers")
-                
-                # Print available periods (for reference, but don't require user input)
-                if self.log_callback:
-                    self.log_callback("INFO", "Fetching available accounting periods...")
-                ps_module.print_period()
-                
+                   
                 # Set period
                 if self.log_callback:
                     self.log_callback("INFO", f"Setting accounting period to: {period}")
@@ -137,6 +132,14 @@ class ProjectStatusAdapter(BaseAdapter):
                 if self.log_callback:
                     self.log_callback("INFO", "Downloading Labor Hours...")
                 ps_module.download_labor_hours()
+
+                if self.log_callback:
+                    self.log_callback("INFO", "Downloading Purchase Orders...")
+                ps_module.download_purchase_orders(projects)
+
+                if self.log_callback:
+                    self.log_callback("INFO", "Downloading Office Earnings...")
+                ps_module.download_office_earnings()
                 
                 # Delete default sheet
                 if self.log_callback:

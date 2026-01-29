@@ -293,11 +293,18 @@ class MainWindow(FluentWindow):
     - Middle: Task content area
     """
     
-    def __init__(self):
-        """Initialize main window."""
+    def __init__(self, startup_progress=None):
+        """
+        Initialize main window.
+        
+        Args:
+            startup_progress: Optional callback function(progress: int, message: str) for startup progress reporting
+        """
         #region agent log
         _agent_log("H6", "MainWindow.__init__", "enter __init__", {})
         #endregion
+        self._startup_progress = startup_progress
+        
         try:
             super().__init__()
         except Exception as exc:
@@ -307,9 +314,11 @@ class MainWindow(FluentWindow):
             raise
         
         # 1. Initialize UI Layout (Size, TitleBar)
+        self._report_progress(40, "Initializing window...")
         self._init_window()
         
         # 2. Application context & State
+        self._report_progress(50, "Loading application context...")
         self.app_context = get_app_context()
         self.current_worker: Optional[BaseWorker] = None
         self.task_pages: Dict[str, BaseTaskPage] = {}
@@ -321,17 +330,38 @@ class MainWindow(FluentWindow):
         self._font_max_pt = 14
         
         # 3. Setup Navigation & Pages
+        self._report_progress(60, "Setting up navigation...")
         self._setup_ui()
+        self._report_progress(70, "Initializing pages...")
         self._init_pages()
+        self._report_progress(80, "Connecting signals...")
         self._connect_signals()
+        self._report_progress(85, "Checking login status...")
         self._check_login_status()
         
         # Apply initial font scaling
         #self._apply_font_scale()
         
+        self._report_progress(90, "Ready")
+        
         #region agent log
         _agent_log("H4", "MainWindow.__init__", "MainWindow initialized", {"pages": list(self.task_pages.keys())})
         #endregion
+    
+    def _report_progress(self, progress: int, message: str) -> None:
+        """
+        Report startup progress if callback is available.
+        
+        Args:
+            progress: Progress value (0-100)
+            message: Progress message
+        """
+        if self._startup_progress:
+            try:
+                self._startup_progress(progress, message)
+            except Exception:
+                # Silently ignore errors in progress reporting to avoid breaking startup
+                pass
 
     def _init_window(self):
         """Initialize basic window properties and custom TitleBar."""

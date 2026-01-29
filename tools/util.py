@@ -344,7 +344,7 @@ def init_workdir():
 def assamble_projects(projects):
     searchOptions = [{"name":"Status","value":"[IS_EMPTY]","type":"dropdown","seq":1,"tableName":"PR","opp":"!=","condition":"and","searchLevel":1,"valueDescription":""}]
     for project in projects:
-        searchOptions.append({"name":"selectedResultIds","value":project,"type":"wbs1","seq":2,"searchLevel":0,"valueDescription":"Monthly Maintenance"})
+        searchOptions.append({"name":"selectedResultIds","value":project,"type":"wbs1","seq":2,"searchLevel":0,"valueDescription":""})
     
     return searchOptions
 
@@ -487,16 +487,18 @@ def change_period(period):
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/PeriodSetup/ActivePeriod/" + period
     response = requests.put(url, headers = headers) 
 
-def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left, right):
+def csv_to_xlsx(csv_path, output_file, sheet_name, need_skip, left = None, right = None):
     if need_skip:
         df = pd.read_csv(csv_path, skiprows=3)
     else:
         df = pd.read_csv(csv_path)
 
-    if isinstance(left, int) and isinstance(right, int):
+    if left is not None and right is not None:
         df = df.iloc[:, left:right+1] 
-    else:
-        df = df.loc[:, left:right] 
+    elif left is not None:
+        df = df.iloc[:, left:]
+    elif right is not None:
+        df = df.iloc[:, :right+1] 
 
     with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         df.to_excel(writer, sheet_name=sheet_name, index=False)

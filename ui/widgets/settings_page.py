@@ -13,11 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QScrollArea,
-    QFormLayout,
-    QLineEdit,
-    QTextEdit,
     QMessageBox,
-    QLabel,
 )
 from PySide6.QtCore import Qt, Signal
 
@@ -28,11 +24,10 @@ from qfluentwidgets import (
     PrimaryPushButton,
     PushButton,
     FluentIcon,
-    LineEdit,
-    PlainTextEdit,
 )
 
 import tools.config_manager as config_manager
+from ui.widgets.json_tree_editor import JsonTreeEditor
 
 
 class SettingsPage(QWidget):
@@ -155,7 +150,7 @@ class SettingsPage(QWidget):
             json.dump(default_config, f, indent=4, ensure_ascii=False)
     
     def _render_config(self) -> None:
-        """Render configuration as form widgets."""
+        """Render configuration using tree editor."""
         # Clear existing widgets
         while self.content_layout.count():
             child = self.content_layout.takeAt(0)
@@ -167,151 +162,29 @@ class SettingsPage(QWidget):
         if not self.current_config:
             return
         
-        # Render top-level keys
-        for key, value in sorted(self.current_config.items()):
-            self._create_config_section(key, value, [key])
-    
-    def _create_config_section(
-        self,
-        key: str,
-        value: Any,
-        key_path: List[str]
-    ) -> None:
-        """
-        Create a configuration section (card) for a key-value pair.
-        
-        Args:
-            key: Configuration key name
-            value: Configuration value (can be dict, list, str, etc.)
-            key_path: Full path to this key (for nested structures)
-        """
+        # Create tree editor card
         card = CardWidget()
         card_layout = QVBoxLayout()
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(12)
         
-        # Section title
-        title_label = BodyLabel(key)
+        # Title
+        title_label = BodyLabel("Configuration")
         title_label.setStyleSheet("font-weight: 600; font-size: 14px;")
         card_layout.addWidget(title_label)
         
-        # Create widget based on value type
-        widget = self._create_value_widget(key, value, key_path)
-        if widget:
-            card_layout.addWidget(widget)
+        # Tree editor
+        self.tree_editor = JsonTreeEditor(
+            self.current_config,
+            editable=self.edit_mode,
+            parent=card
+        )
+        self.tree_editor.data_changed.connect(self._on_tree_data_changed)
+        card_layout.addWidget(self.tree_editor)
         
         card.setLayout(card_layout)
         self.content_layout.addWidget(card)
     
-    def _create_value_widget(
-        self,
-        key: str,
-        value: Any,
-        key_path: List[str]
-    ) -> Optional[QWidget]:
-        """
-        Create appropriate widget for a configuration value.
-        
-        Args:
-            key: Configuration key name
-            value: Configuration value
-            key_path: Full path to this key
-            
-        Returns:
-            Widget for editing/viewing the value
-        """
-        key_path_str = ".".join(key_path)
-        
-        if isinstance(value, dict):
-            # Nested object - create form layout
-            form = QFormLayout()
-            form.setSpacing(8)
-            
-            for sub_key, sub_value in sorted(value.items()):
-                sub_key_path = key_path + [sub_key]
-                sub_widget = self._create_value_widget(sub_key, sub_value, sub_key_path)
-                if sub_widget:
-                    form.addRow(f"{sub_key}:", sub_widget)
-            
-            container = QWidget()
-            container.setLayout(form)
-            return container
-        
-        elif isinstance(value, list):
-            # Array - create text area for comma-separated or multi-line
-            if all(isinstance(item, str) for item in value):
-                # String array - show as comma-separated
-                text = ", ".join(value)
-                if self.edit_mode:
-                    widget = LineEdit()
-                    widget.setText(text)
-                    widget.setPlaceholderText("Enter values separated by commas")
-                    self.config_widgets[key_path_str] = (widget, "string_array")
-                else:
-                    widget = QLabel(text)
-                    widget.setStyleSheet("color: #666; padding: 4px;")
-                return widget
-            else:
-                # Complex array - show as JSON
-                text = json.dumps(value, indent=2, ensure_ascii=False)
-                if self.edit_mode:
-                    widget = PlainTextEdit()
-                    widget.setPlainText(text)
-                    widget.setMaximumHeight(150)
-                    self.config_widgets[key_path_str] = (widget, "json_array")
-                else:
-                    widget = QLabel(text)
-                    widget.setStyleSheet("color: #666; padding: 4px;")
-                    widget.setWordWrap(True)
-                return widget
-        
-        elif isinstance(value, str):
-            # String - use LineEdit for short strings, TextEdit for long
-            if len(value) > 100 or "\n" in value:
-                if self.edit_mode:
-                    widget = PlainTextEdit()
-                    widget.setPlainText(value)
-                    widget.setMaximumHeight(150)
-                    self.config_widgets[key_path_str] = (widget, "long_string")
-                else:
-                    widget = QLabel(value)
-                    widget.setStyleSheet("color: #666; padding: 4px;")
-                    widget.setWordWrap(True)
-            else:
-                if self.edit_mode:
-                    widget = LineEdit()
-                    widget.setText(value)
-                    self.config_widgets[key_path_str] = (widget, "string")
-                else:
-                    widget = QLabel(value)
-                    widget.setStyleSheet("color: #666; padding: 4px;")
-            return widget
-        
-        elif isinstance(value, (int, float, bool)):
-            # Number or boolean - show as string
-            text = str(value)
-            if self.edit_mode:
-                widget = LineEdit()
-                widget.setText(text)
-                self.config_widgets[key_path_str] = (widget, "number" if isinstance(value, (int, float)) else "boolean")
-            else:
-                widget = QLabel(text)
-                widget.setStyleSheet("color: #666; padding: 4px;")
-            return widget
-        
-        else:
-            # Unknown type - show as JSON
-            text = json.dumps(value, indent=2, ensure_ascii=False)
-            if self.edit_mode:
-                widget = PlainTextEdit()
-                widget.setPlainText(text)
-                widget.setMaximumHeight(150)
-                self.config_widgets[key_path_str] = (widget, "json")
-            else:
-                widget = QLabel(text)
-                widget.setStyleSheet("color: #666; padding: 4px;")
-                widget.setWordWrap(True)
-            return widget
     
     def _on_edit_clicked(self) -> None:
         """Handle Edit button click - enter edit mode."""
@@ -320,14 +193,23 @@ class SettingsPage(QWidget):
         self.save_btn.setEnabled(True)
         self.cancel_btn.setEnabled(True)
         
-        # Re-render with editable widgets
+        # Re-render with editable tree editor
         self._render_config()
+    
+    def _on_tree_data_changed(self) -> None:
+        """Handle tree editor data change."""
+        # Update current config from tree editor
+        if hasattr(self, 'tree_editor'):
+            self.current_config = self.tree_editor.get_data()
     
     def _on_save_clicked(self) -> None:
         """Handle Save button click - save configuration."""
         try:
-            # Collect data from widgets
-            updated_config = self._collect_config_from_widgets()
+            # Get data from tree editor
+            if hasattr(self, 'tree_editor'):
+                updated_config = self.tree_editor.get_data()
+            else:
+                updated_config = self.current_config
             
             # Validate configuration
             validation_result = self._validate_config(updated_config)
@@ -400,55 +282,6 @@ class SettingsPage(QWidget):
         # Re-render in view mode
         self._render_config()
     
-    def _collect_config_from_widgets(self) -> Dict[str, Any]:
-        """Collect configuration values from UI widgets."""
-        config = deepcopy(self.current_config)
-        
-        for key_path_str, (widget, value_type) in self.config_widgets.items():
-            key_path = key_path_str.split(".")
-            
-            # Get value from widget
-            if isinstance(widget, LineEdit):
-                value = widget.text()
-            elif isinstance(widget, PlainTextEdit):
-                value = widget.toPlainText()
-            else:
-                continue
-            
-            # Convert value based on type
-            if value_type == "string_array":
-                # Split comma-separated string into array
-                value = [item.strip() for item in value.split(",") if item.strip()]
-            elif value_type == "number":
-                try:
-                    # Try to convert to int first, then float
-                    if "." in value:
-                        value = float(value)
-                    else:
-                        value = int(value)
-                except ValueError:
-                    # Keep as string if conversion fails
-                    pass
-            elif value_type == "boolean":
-                # Convert string to boolean
-                value = value.lower() in ("true", "1", "yes")
-            elif value_type in ("json_array", "json"):
-                # Parse JSON
-                try:
-                    value = json.loads(value)
-                except json.JSONDecodeError:
-                    # Keep as string if JSON parsing fails
-                    pass
-            
-            # Set value in config
-            node = config
-            for key in key_path[:-1]:
-                if key not in node:
-                    node[key] = {}
-                node = node[key]
-            node[key_path[-1]] = value
-        
-        return config
     
     def _validate_config(self, config: Dict[str, Any]) -> tuple[bool, str]:
         """

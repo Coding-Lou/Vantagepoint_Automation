@@ -34,7 +34,7 @@ class StatementCheckTaskPage(BaseTaskPage):
         """Initialize Statement Check task page."""
         super().__init__(
             "statement_check",
-            "Statement Check",
+            "Vendor Statement Check",
             parent
         )
     

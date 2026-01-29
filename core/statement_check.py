@@ -95,9 +95,15 @@ def check_statement(vendor_key, invoice_number):
     #endregion
     
     if len(data) == 0 :
-        print(f"{invoice_number} not been vouched")
+        return False
     else:
-        print(f"{invoice_number} voucher number {data[0]['Voucher']} payment date {data[0]['PaymentDate'][:10]} ")
+        cheque_date_str = data[0]['CheckDate']
+        if cheque_date_str is None or cheque_date_str.strip() == "":
+            cheque_date_str = "will be paid on next payment run"
+        else :
+            cheque_date_str = f" paid on {cheque_date_str[:10]}"
+        print(f"{invoice_number} voucher number {data[0]['Voucher']} {cheque_date_str}")
+        return True
 
 def main(vendor_key: str = None, invoice_numbers: str = None):
     """
@@ -123,6 +129,8 @@ def main(vendor_key: str = None, invoice_numbers: str = None):
     #endregion
     
     init()
+
+    not_vouched_list = []
     
     if vendor_key is None:
         vendor_key = input("Enter vendor key: ")
@@ -159,7 +167,14 @@ def main(vendor_key: str = None, invoice_numbers: str = None):
     
     invoice_number_list = invoice_numbers.split(',') if invoice_numbers else []
     for invoice_number in invoice_number_list:
-        check_statement(vendor_key.strip(), invoice_number.strip())
+        result = check_statement(vendor_key.strip(), invoice_number.strip())
+        if not result:
+            not_vouched_list.append(invoice_number)
+    print()
+    print(f"Total not vouched invoices: {len(not_vouched_list)}")
+    print("--------------------------------")
+    for invoice_number in not_vouched_list:
+        print(f"{invoice_number} not been vouched")
 
 if __name__ == "__main__":
     main()

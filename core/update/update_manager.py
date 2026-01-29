@@ -59,7 +59,7 @@ class UpdateManager:
         
         Args:
             download_url: URL to download from
-            save_to_temp: If True, save to temp directory; otherwise save to exe directory
+            save_to_temp: If True, save to C:\\temp directory; otherwise save to exe directory
             
         Returns:
             Path to downloaded file
@@ -69,8 +69,13 @@ class UpdateManager:
             OSError: On file system errors
         """
         if save_to_temp:
-            # Save to temp directory
-            temp_dir = Path(tempfile.gettempdir())
+            # Save to C:\temp directory (fixed path for Windows)
+            if sys.platform == "win32":
+                temp_dir = Path("C:\\temp")
+            else:
+                temp_dir = Path(tempfile.gettempdir())
+            # Ensure directory exists
+            temp_dir.mkdir(parents=True, exist_ok=True)
             save_path = temp_dir / self.exe_name
         else:
             # Save to same directory as current exe

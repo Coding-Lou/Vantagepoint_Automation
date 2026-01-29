@@ -226,7 +226,15 @@ class UpdateDialog(QDialog):
         elif success:
             # Update will restart the application, so we can close the dialog
             self._append_log("SUCCESS", "Update completed. Application will restart.")
-            # Dialog will be closed when app restarts
+            # Close dialog and exit application to allow updater to replace exe
+            self.accept()
+            # Close the main application
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app:
+                # Give a small delay to ensure log message is displayed
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(500, app.quit)
         else:
             error_msg = result.get("message", "Unknown error")
             self.check_btn.setEnabled(True)

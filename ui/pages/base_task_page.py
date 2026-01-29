@@ -152,8 +152,8 @@ class BaseTaskPage(QWidget):
         # Log viewer - Use QTextEdit for HTML support
         self.log_viewer = QTextEdit()
         self.log_viewer.setReadOnly(True)
-        # Keep it flexible; the page is now scrollable, so don't force a tall minimum
-        self.log_viewer.setMinimumHeight(140)
+        # Set minimum height for better log visibility
+        self.log_viewer.setMinimumHeight(500)
         self.log_viewer.setStyleSheet(f"""
             QTextEdit {{
                 background-color: #1e1e1e;

@@ -8,6 +8,7 @@ from typing import Dict, Any, Tuple
 from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
+    QComboBox,
 )
 from PySide6.QtCore import Qt
 
@@ -22,6 +23,7 @@ from qfluentwidgets import (
 from ui.pages.base_task_page import BaseTaskPage
 from workers.project_status_worker import ProjectStatusWorker
 import tools.util as util_module
+import core.project_status as ps_module
 
 
 class ProjectStatusTaskPage(BaseTaskPage):
@@ -31,6 +33,10 @@ class ProjectStatusTaskPage(BaseTaskPage):
     
     def __init__(self, parent=None):
         """Initialize Project Status task page."""
+        # Initialize period_data_map before calling super().__init__()
+        # because BaseTaskPage.__init__ calls _create_config_widgets() which uses this attribute
+        self.period_data_map: Dict[str, str] = {}
+        
         super().__init__(
             "project_status",
             "Project Status",
@@ -49,7 +55,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
         self.config_layout.addWidget(tutorial_label)
         
         tutorial_text = BodyLabel(
-            "1. Enter the accounting period in YYYYMM format (e.g., 202607).\n"
+            "1. Select an accounting period from the dropdown menu.\n"
             "2. Enter project name(s) separated by commas (e.g., Project1, Project2, Project3).\n"
             "3. Click 'Execute' to generate the project status report."
         )
@@ -65,16 +71,30 @@ class ProjectStatusTaskPage(BaseTaskPage):
         period_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(period_label)
         
-        self.period_edit = LineEdit()
-        self.period_edit.setPlaceholderText("202607 (YYYYMM format)")
-        self.period_edit.setStyleSheet("""
-            LineEdit {
+        self.period_combo = QComboBox()
+        self.period_combo.setStyleSheet("""
+            QComboBox {
                 padding: 6px;
                 border: 1px solid #d0d0d0;
                 border-radius: 4px;
+                background-color: white;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 8px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 4px solid #666;
+                margin-right: 4px;
             }
         """)
-        self.config_layout.addWidget(self.period_edit)
+        
+        # Load periods from print_period()
+        self._load_periods()
+        self.config_layout.addWidget(self.period_combo)
         
         # Spacer
         self.config_layout.addSpacing(12)
@@ -100,15 +120,62 @@ class ProjectStatusTaskPage(BaseTaskPage):
         # Project status doesn't have saved config, but we can load default period if available
         pass
     
+    def _load_periods(self) -> None:
+        """Load periods from print_period() and populate the dropdown."""
+        # Ensure period_combo exists
+        if not hasattr(self, 'period_combo'):
+            return
+            
+        try:
+            # Update headers to ensure fresh authentication
+            ps_module.HEADERS = util_module.set_headers()
+            
+            # Get period data from print_period()
+            period_data = ps_module.print_period()
+            
+            # Clear existing items and mapping
+            self.period_combo.clear()
+            self.period_data_map.clear()
+            
+            # Populate dropdown with formatted display text
+            for p in period_data:
+                display_text = f"{p['Period']} | From: {p['AccountPdStart'][:10]} To: {p['AccountPdEnd'][:10]}"
+                # Convert Period to string to ensure type compatibility
+                period_value = str(p['Period'])
+                
+                # Store mapping: display text -> Period value
+                self.period_data_map[display_text] = period_value
+                
+                # Add to dropdown
+                self.period_combo.addItem(display_text)
+            
+            # Select first item if available
+            if self.period_combo.count() > 0:
+                self.period_combo.setCurrentIndex(0)
+                
+        except Exception as e:
+            # If loading fails, add an error message
+            try:
+                self.period_combo.clear()
+                self.period_combo.addItem("Error loading periods - please check connection")
+            except Exception:
+                pass
+            print(f"Error loading periods: {e}")
+    
     def _validate_params(self) -> Tuple[bool, str]:
         """Validate task parameters."""
-        period = self.period_edit.text().strip()
-        if not period:
-            return False, "Please enter an accounting period (YYYYMM format)"
+        # Check if period is selected
+        if self.period_combo.currentIndex() < 0 or self.period_combo.currentText() == "":
+            return False, "Please select an accounting period"
         
-        # Validate period format (should be 6 digits: YYYYMM)
-        if not period.isdigit() or len(period) != 6:
-            return False, "Period must be in YYYYMM format (e.g., 202607)"
+        # Check if period data is valid (not error message)
+        current_text = self.period_combo.currentText()
+        if current_text.startswith("Error loading periods"):
+            return False, "Please ensure periods are loaded correctly"
+        
+        # Verify period value exists in mapping
+        if current_text not in self.period_data_map:
+            return False, "Invalid period selection"
         
         projects = self.projects_edit.text().strip()
         if not projects:
@@ -123,7 +190,14 @@ class ProjectStatusTaskPage(BaseTaskPage):
     
     def _get_params(self) -> Dict[str, Any]:
         """Get task parameters from UI."""
-        period = self.period_edit.text().strip()
+        # Get Period value from selected display text
+        current_text = self.period_combo.currentText()
+        period = self.period_data_map.get(current_text, "")
+        
+        # Ensure period is a string (convert if needed)
+        if period:
+            period = str(period)
+        
         projects_text = self.projects_edit.text().strip()
         
         return {

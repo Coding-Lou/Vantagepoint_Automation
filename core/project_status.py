@@ -1,3 +1,4 @@
+import csv
 import tools.util as util
 import requests
 import re
@@ -26,8 +27,8 @@ def print_period():
     data = response.json()[:5]
     for p in data:
         print(f"{p['Period']} | From: {p['AccountPdStart'][:10]} To: {p['AccountPdEnd'][:10]}")
-    
-    print("----------------------------")
+
+    return data
 
 def download_invoices():
     try:
@@ -272,6 +273,107 @@ def download_labor_hours():
     except Exception as e:
         print("⚠️ Failed to copy the data to output file:", e)
 
+def download_purchase_orders(projects):
+    write_header = False
+    exportFileName = "Project Purchase Orders_" + date.today().strftime("%Y-%m-%d") + ".csv"
+    csvName = os.path.join("project status", exportFileName)
+
+    try:
+        with open(csvName, "w", newline="", encoding="utf-8-sig") as f:
+            writer = None
+            for project in projects:
+                url = (
+                    f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/"
+                    f"projectreview/{project}/PurchaseOrders?Closed=N&POStatus="
+                )
+                response = requests.get(url, headers=HEADERS)
+                po_data = response.json()
+
+                if len(po_data) == 0:
+                    print(f"⚠️ No open purchase orders for project {project}")
+                    continue
+
+                for row in po_data:
+                    row["Project_Number"] = project
+
+                if not write_header:
+                    writer = csv.DictWriter(f, fieldnames=po_data[0].keys())
+                    writer.writeheader()
+                    write_header = True
+
+                writer.writerows(po_data)
+
+        print("✅ " + exportFileName + " generated")
+
+        try:
+            util.csv_to_xlsx(csvName, output_file, "PO Export", False, 1, 16)
+        except Exception as e:
+            print("⚠️ Failed to copy the purchase orders data to output file:", e)
+
+    except Exception as e:
+        print(f"⚠️ Failed to download purchase orders for project {project}:", e)
+
+def download_office_earnings():
+    try:
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
+        payload = {"reportPath":"/Standard/Project/Office Earnings","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseChart3D":"N","baseChartColumn":"rev","baseChartDivisor":"1","baseChartFontSize":8,"baseChartHeight":3,"baseChartLabelLines":"N","baseChartLabels":"none","baseChartLeft":1,"baseChartLegendPosition":"righttop","baseChartSeriesColumn2":"","baseChartSeriesColumn3":"","baseChartShowPosition":"1","baseChartTitle":"","baseChartTop":0.5,"baseChartType":"none","baseChartWidth":6,"baseChartXTitle":"Biller Number","baseChartYTitle":"","baseCulture":"default","baseDefaultCurrencyFormat":"#########D##;-#########D##;0D00","baseDefaultDateFormat":"M/d/yyyy","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"#########D##;-#########D##;0D00","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"N","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"Office Earnings","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"Y","baseStartColumnPosition":2,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[{"label":"Biller Number","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"biller","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Status","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"projectStatus","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Primary Client Name","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"clientName","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Project Number","sort":"ASC","color":"000080","subTotal":"Y","showHeading":"Y","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"projectNumber","customGridColumnSort":"","groupWBSLevel":"1"}],"ReportColumns":[{"heading":"Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev","username":"","customGridColumnSort":""},{"heading":"Total Billed","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"bill","username":"","customGridColumnSort":""},{"heading":"Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb","username":"","customGridColumnSort":""},{"heading":"Revenue Type","width":0.95,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"wbs3revType","username":"","customGridColumnSort":""},{"heading":"Hardware Rev Type","width":0.95,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"wbs3revType2","username":"","customGridColumnSort":""},{"heading":"Software Rev Type","width":0.95,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"wbs3revType3","username":"","customGridColumnSort":""},{"heading":"Outside Services Rev Type","width":0.95,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"wbs3revType4","username":"","customGridColumnSort":""},{"heading":"Others (Expenses) Rev Type","width":0.95,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"wbs3revType5","username":"","customGridColumnSort":""},{"heading":"Labour Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev1","username":"","customGridColumnSort":""},{"heading":"Hardware Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev2","username":"","customGridColumnSort":""},{"heading":"Software Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev3","username":"","customGridColumnSort":""},{"heading":"Outside Services Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev4","username":"","customGridColumnSort":""},{"heading":"Others (Expenses) Revenue","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"rev5","username":"","customGridColumnSort":""},{"heading":"Contract Number","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustContractNumber","username":"","customGridColumnSort":"N"},{"heading":"Contract Total Compensation","width":1,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"contractTotComp","username":"","customGridColumnSort":""},{"heading":"JTD Spent Labor, cost-plus","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDSpentLaborcostplus","username":"","customGridColumnSort":"N"},{"heading":"JTD Spent HW, cost-plus","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDSpentHWcostplus","username":"","customGridColumnSort":"N"},{"heading":"JTD Spent SW, cost-plus","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDSpentSWcostplus","username":"","customGridColumnSort":"N"},{"heading":"JTD Spent OS, cost-plus","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDSpentOScostplus","username":"","customGridColumnSort":"N"},{"heading":"JTD Spent OE, cost-plus","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDSpentOEcostplus","username":"","customGridColumnSort":"N"},{"heading":"JTD Write-off Labor","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDWriteoffLabor","username":"","customGridColumnSort":"N"},{"heading":"JTD Write-off HW","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDWriteoffHW","username":"","customGridColumnSort":"N"},{"heading":"JTD Write-off SW","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDWriteoffSW","username":"","customGridColumnSort":"N"},{"heading":"JTD Write-off OS","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDWriteoffOS","username":"","customGridColumnSort":"N"},{"heading":"JTD Write-off OE","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustJTDWriteoffOE","username":"","customGridColumnSort":"N"},{"heading":"Proposal Hours on Hold","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustProposalHoursonHold","username":"","customGridColumnSort":"N"},{"heading":"Labour Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb1","username":"","customGridColumnSort":""},{"heading":"Hardware Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb2","username":"","customGridColumnSort":""},{"heading":"Software Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb3","username":"","customGridColumnSort":""},{"heading":"Outside Services Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb4","username":"","customGridColumnSort":""},{"heading":"Others (Expenses) Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb5","username":"","customGridColumnSort":""},{"heading":"Other Unbilled","width":0.85,"format":"#########D##;-#########D##;0D00","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unbOther","username":"","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":{"pKey":"","name":"","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions": searchOptions},"baseCreateActivity":"N","baseShowDetail":"Y","baseLeft1":0,"baseRight1":21,"baseLeft2":0,"baseRight2":8,"baseLeft3":0,"baseRight3":8,"baseSub":"1","rollType":"Project","CurrentWBSActivityActiveWBS1Only":"N","CurrentWBSActivityActiveWBS2Only":"N","CurrentWBSActivityActiveWBS3Only":"N","CurrentWBSActivityActivityRange":"1","CurrentWBSActivityInclInvoiceActivity":"N","drillDownSort":"1","budgetSelection":"1","ETCDRadioChecked":"radioETCD1","atCost":"2","labDrillDown":"1","expDrillDown":"1","showCur":"N","showYTD":"N","showJTD":"Y","custDate":"N","LabelCustDate":"Period Range","showOverhead":"N","estimateOverhead":"N","showUnposted":"N","chkIncludeCommitPO":"N","useSummaryTable":"N","excludeContractsNotinFees":"N","CurrentWBSActivityCheckLabor":"Y","CurrentWBSActivityCheckExpense":"Y","PrintDirects":"Y","ETCDate":"5/16/2024 1:38:16 PM","baseChartColumnDisplayTimeframe":"JTD","SummaryTableLastUpdate":"","CurrentWBSActivityUnpostedLabor":"N","CurrentWBSActivityCommittedExp":"N","baseOriginalFavoriteId":"","baseSelectionRows":1,"_desc_saveOptionRole":["","",""],"saveOptionRole":["ACCOUNTING","[CREATOR_USERNAME]","ACCOUNTANT"]}}
+
+        response = requests.post(url, headers=HEADERS, json=payload  )
+        data = response.json()
+        report_path_raw = data["return"]["ReportPath"]
+        report_path = report_path_raw.replace(" ", "%20")
+
+        # Step 2: Get Nonce
+        nonceUrl = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+        payload = {}
+        response = requests.post(nonceUrl, headers=HEADERS, json=payload  )
+        nonce = response.json()
+
+        # Step 3: Get Viewer
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&ResetReportViewerOnPreview=Y&reportPath="+report_path+"&allowSchedule=Y&origReportPath=/Standard/Project/Office%20Earnings&reportName=Office%20Earnings "
+
+        # Step 4: Get report session
+        response = requests.get(url, headers=HEADERS )
+        html = response.text
+        report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
+        control_id = re.search(r"ControlID=([A-Za-z0-9]+)", html)
+        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+
+        if not (report_session and control_id):
+            raise RuntimeError("Error")
+        
+        exportFileName = "Project Office Earnings_"+ date.today().strftime("%Y-%m-%d") + ".csv"
+
+        # Step 5: Download the csv report
+        url = ( "https://qcadeltek03.qcasystems.com"
+                "/Vantagepoint/Reporting/Reserved.ReportViewerWebControl.axd"
+                f"?ReportSession={report_session.group(1)}"
+                "&Culture=1033&CultureOverrides=True"
+                "&UICulture=2057&UICultureOverrides=True"
+                "&ReportStack=1"
+                f"&ControlID={control_id.group(1)}"
+                "&RSProxy=https%3a%2f%2fqcadeltek03.qcasystems.com%2fReportServer"
+                "&OpType=Export&FileName=Office+Earnings&ContentDisposition=OnlyHtmlInline&Format=CSV" )
+        
+        response = requests.get(url, headers = HEADERS,stream=True  )
+        if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
+            csvName = os.path.join("project status", exportFileName)
+            if os.path.exists(csvName):
+                os.remove(csvName)
+            with open(csvName, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            print("✅ "+ csvName+" Downloaded")
+    except Exception as e:
+        print("⚠️ Failed to download the office earnings:", e)
+    
+    try:
+        util.csv_to_xlsx(csvName, output_file, "Office earnings", need_skip=True)
+    except Exception as e:
+        print("⚠️ Failed to copy the data to output file:", e)
+
 def delete_default_sheet():
     wb = load_workbook(output_file)
     ws = wb["Sheet"]
@@ -280,7 +382,7 @@ def delete_default_sheet():
 
 def main():
     global searchOptions
-    print_period()
+    #print_period()
     period = input("Please input the period (202607): ")
     util.change_period(period)
     
@@ -300,7 +402,9 @@ def main():
     download_earnings()
     download_expenses()
     download_labor_hours()
-    
+    download_purchase_orders(projects)
+    download_office_earnings()
+
     delete_default_sheet()
 
     print(f'The output file is: output_{date.today().strftime("%Y-%m-%d")}.xlsx')

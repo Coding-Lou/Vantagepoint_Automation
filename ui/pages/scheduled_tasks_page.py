@@ -7,9 +7,12 @@ Features:
 - Manual task execution
 - Initialize scheduled tasks in Windows Task Scheduler
 """
+import os
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
+import sys
+import subprocess
 from datetime import datetime
 from ui.utils.log_redirector import LogRedirector
 

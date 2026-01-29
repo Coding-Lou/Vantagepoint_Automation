@@ -127,9 +127,10 @@ def launch_ui() -> int:
     _agent_log("H1", "main.launch_ui", "UI launch starting", {"argv": sys.argv})
     #endregion
     
+    progress_dialog = None
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
-        from PySide6.QtCore import Qt
+        from PySide6.QtCore import Qt, QTimer
         from PySide6.QtGui import QGuiApplication, QFont
         
         #region agent log
@@ -178,11 +179,34 @@ def launch_ui() -> int:
         #region agent log
         _agent_log("H5", "main.launch_ui", "After set app properties", {})
         #endregion
+
+        # Show a lightweight startup progress UI to improve perceived startup performance.
+        try:
+            from ui.widgets.startup_progress_dialog import StartupProgressDialog
+
+            progress_dialog = StartupProgressDialog()
+            progress_dialog.show()
+            progress_dialog.set_progress(5, "Initializing application...")
+            app.processEvents()
+        except Exception:
+            # Startup progress is best-effort; never block startup if it fails.
+            progress_dialog = None
+
+        def _report_startup(percent: int, text: str) -> None:
+            """Update startup progress UI (best-effort)."""
+            if not progress_dialog:
+                return
+            try:
+                progress_dialog.set_progress(percent, text)
+                app.processEvents()
+            except Exception:
+                pass
         
         # Import MainWindow after QApplication is created
         #region agent log
         _agent_log("H3", "main.launch_ui", "Before importing MainWindow", {"has_app": bool(QApplication.instance())})
         #endregion
+        _report_startup(15, "Loading UI modules...")
         from ui.main_window import MainWindow
         #region agent log
         _agent_log(
@@ -222,14 +246,21 @@ def launch_ui() -> int:
         #region agent log
         _agent_log("H4", "main.launch_ui", "Before creating MainWindow instance", {"has_app": bool(QApplication.instance())})
         #endregion
-        window = MainWindow()
+        _report_startup(35, "Building main window...")
+        window = MainWindow(startup_progress=_report_startup)
         #region agent log
         _agent_log("H4", "main.launch_ui", "MainWindow created", {"has_app": bool(QApplication.instance())})
         #endregion
+        _report_startup(90, "Finalizing...")
         window.show()
         #region agent log
         _agent_log("H5", "main.launch_ui", "Window shown", {})
         #endregion
+
+        # Close the startup progress UI shortly after the main window is visible.
+        if progress_dialog:
+            _report_startup(100, "Ready")
+            QTimer.singleShot(250, progress_dialog.close)
         
         # Run event loop
         #region agent log
@@ -240,6 +271,13 @@ def launch_ui() -> int:
         #region agent log
         _agent_log("H5", "main.launch_ui", "Main exception", {"error": str(exc), "type": type(exc).__name__, "has_app": bool(QApplication.instance())})
         #endregion
+        # Ensure startup progress UI is closed if we fail during startup.
+        try:
+            if progress_dialog:
+                progress_dialog.close()
+        except Exception:
+            pass
+
         # Print error to console for debugging
         import traceback
         error_msg = f"Application error: {str(exc)}\n{traceback.format_exc()}"
@@ -303,6 +341,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    util.init_workdir()
     exit_code = main()
     if exit_code == 0 and not any(
         arg in sys.argv for arg in ["--ap", "--ar", "--project_status", "--bridge", 
