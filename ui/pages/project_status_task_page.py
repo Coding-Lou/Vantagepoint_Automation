@@ -24,6 +24,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_task_page import BaseTaskPage
+from ui.utils.theme_colors import ThemeColors
 from workers.project_status_worker import ProjectStatusWorker
 from ui.services.app_context import get_app_context
 import tools.util as util_module
@@ -68,7 +69,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
             "3. Click 'Execute' to generate the project status report."
         )
         tutorial_text.setWordWrap(True)
-        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;")
+        tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
         
         # Spacer
@@ -80,24 +81,29 @@ class ProjectStatusTaskPage(BaseTaskPage):
         self.config_layout.addWidget(period_label)
         
         self.period_combo = QComboBox()
-        self.period_combo.setStyleSheet("""
-            QComboBox {
+        bg = ThemeColors.background_input()
+        text = ThemeColors.text_primary()
+        border = ThemeColors.border_primary()
+        arrow_color = ThemeColors.text_secondary()
+        self.period_combo.setStyleSheet(f"""
+            QComboBox {{
                 padding: 6px;
-                border: 1px solid #d0d0d0;
+                border: 1px solid {border};
                 border-radius: 4px;
-                background-color: white;
-            }
-            QComboBox::drop-down {
+                background-color: {bg};
+                color: {text};
+            }}
+            QComboBox::drop-down {{
                 border: none;
                 padding-right: 8px;
-            }
-            QComboBox::down-arrow {
+            }}
+            QComboBox::down-arrow {{
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 4px solid #666;
+                border-top: 4px solid {arrow_color};
                 margin-right: 4px;
-            }
+            }}
         """)
         
         # Load periods from print_period()
@@ -167,13 +173,13 @@ class ProjectStatusTaskPage(BaseTaskPage):
         
         self.projects_edit = LineEdit()
         self.projects_edit.setPlaceholderText("Project1, Project2, Project3 (comma-separated)")
-        self.projects_edit.setStyleSheet("""
-            LineEdit {
-                padding: 6px;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-            }
-        """)
+        self.projects_edit.setStyleSheet(
+            f"""
+            LineEdit {{
+                {ThemeColors.get_input_style()}
+            }}
+            """
+        )
         self.config_layout.addWidget(self.projects_edit)
         
         # Set initial visibility state (manual mode is default, so project input is visible)

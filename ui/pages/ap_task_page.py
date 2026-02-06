@@ -27,6 +27,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_task_page import BaseTaskPage
+from ui.utils.theme_colors import ThemeColors
 from workers.ap_worker import APWorker
 import tools.util as util_module
 import tools.config_manager as config_manager
@@ -64,7 +65,7 @@ class APTaskPage(BaseTaskPage):
             "4. Click 'Execute' to generate and send remittance advice emails."
         )
         tutorial_text.setWordWrap(True)
-        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;")
+        tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
         
         # Spacer
@@ -177,46 +178,20 @@ class APTaskPage(BaseTaskPage):
     
     def _apply_date_edit_style(self) -> None:
         """Apply theme-aware style to date picker."""
-        if isDarkTheme():
-            border_color = "#3c3c3c"
-            bg_color = "#202020"
-            text_color = "#f0f0f0"
-        else:
-            border_color = "#d0d0d0"
-            bg_color = "#ffffff"
-            text_color = "#000000"
-
         self.date_edit.setStyleSheet(
             f"""
             QDateEdit {{
-                padding: 6px;
-                border: 1px solid {border_color};
-                border-radius: 4px;
-                background-color: {bg_color};
-                color: {text_color};
+                {ThemeColors.get_input_style()}
             }}
             """
         )
 
     def _apply_mail_body_style(self) -> None:
         """Apply theme-aware style to mail body editor."""
-        if isDarkTheme():
-            border_color = "#3c3c3c"
-            bg_color = "#202020"
-            text_color = "#f0f0f0"
-        else:
-            border_color = "#d0d0d0"
-            bg_color = "#ffffff"
-            text_color = "#000000"
-
         self.mail_body_edit.setStyleSheet(
             f"""
             QTextEdit {{
-                border: 1px solid {border_color};
-                border-radius: 4px;
-                padding: 6px;
-                background-color: {bg_color};
-                color: {text_color};
+                {ThemeColors.get_input_style()}
             }}
             """
         )

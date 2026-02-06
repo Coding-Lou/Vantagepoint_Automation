@@ -50,7 +50,8 @@ class StartupProgressDialog(QDialog):
 
         self._subtitle = BodyLabel("Starting...")
         self._subtitle.setWordWrap(True)
-        self._subtitle.setStyleSheet("color: #808080;")
+        from ui.utils.theme_colors import ThemeColors
+        self._subtitle.setStyleSheet(f"color: {ThemeColors.text_muted()};")
         card_layout.addWidget(self._subtitle)
 
         self._progress = QProgressBar(self)

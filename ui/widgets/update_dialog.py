@@ -23,6 +23,7 @@ from qfluentwidgets import (
 )
 
 from workers.update_worker import UpdateWorker, UpdateCheckWorker
+from ui.utils.theme_colors import ThemeColors
 
 
 class UpdateDialog(QDialog):
@@ -66,7 +67,7 @@ class UpdateDialog(QDialog):
         status_layout.addWidget(self.status_label)
         
         self.version_label = BodyLabel("")
-        self.version_label.setStyleSheet("color: #808080;")
+        self.version_label.setStyleSheet(f"color: {ThemeColors.text_muted()};")
         status_layout.addWidget(self.version_label)
         
         layout.addWidget(self.status_card)
@@ -86,16 +87,7 @@ class UpdateDialog(QDialog):
         self.log_viewer = QTextEdit()
         self.log_viewer.setReadOnly(True)
         self.log_viewer.setMinimumHeight(150)
-        self.log_viewer.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                font-family: 'Consolas', 'Courier New', monospace;
-                border: 1px solid #3c3c3c;
-                border-radius: 4px;
-                padding: 8px;
-            }
-        """)
+        self.log_viewer.setStyleSheet(ThemeColors.get_log_viewer_style())
         layout.addWidget(self.log_viewer)
         
         # Buttons
@@ -261,12 +253,12 @@ class UpdateDialog(QDialog):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         color_map = {
-            "INFO": "#d4d4d4",
-            "SUCCESS": "#4ec9b0",
-            "WARNING": "#dcdcaa",
-            "ERROR": "#f48771",
+            "INFO": ThemeColors.log_color_info(),
+            "SUCCESS": ThemeColors.log_color_success(),
+            "WARNING": ThemeColors.log_color_warning(),
+            "ERROR": ThemeColors.log_color_error(),
         }
-        color = color_map.get(level, "#d4d4d4")
+        color = color_map.get(level, ThemeColors.log_color_info())
         
         formatted_msg = f'<span style="color: {color}">[{timestamp}] [{level}] {message}</span><br>'
         self.log_viewer.append(formatted_msg)

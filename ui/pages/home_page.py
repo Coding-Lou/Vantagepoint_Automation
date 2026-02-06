@@ -23,6 +23,7 @@ from qfluentwidgets import (
 )
 
 from ui.services.app_context import get_app_context
+from ui.utils.theme_colors import ThemeColors
 
 
 class HomePage(QWidget):
@@ -207,10 +208,10 @@ class HomePage(QWidget):
             if isinstance(status_label, QLabel):
                 if is_logged_in:
                     status_text = f"Logged in\n{user_email or 'User'}"
-                    status_label.setStyleSheet("color: #4caf50; font-size: 14px;")  # Green
+                    status_label.setStyleSheet(f"color: {ThemeColors.status_success()}; font-size: 14px;")
                 else:
                     status_text = "Not logged in"
-                    status_label.setStyleSheet("color: #f44336; font-size: 14px;")  # Red
+                    status_label.setStyleSheet(f"color: {ThemeColors.status_error()}; font-size: 14px;")
                 status_label.setText(status_text)
         
         # Update login button
@@ -276,6 +277,28 @@ class HomePage(QWidget):
         # Update button text and tooltip
         self.theme_btn.setText(self._get_theme_button_text())
         self.theme_btn.setToolTip(self._get_theme_tooltip())
+        
+        # Trigger theme update for all pages after a short delay
+        # This ensures the theme change has propagated
+        QTimer.singleShot(100, self._trigger_theme_update)
+    
+    def _trigger_theme_update(self) -> None:
+        """Trigger theme update for parent MainWindow."""
+        # Find MainWindow through parent hierarchy
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'update_theme_for_all_pages'):
+                # Use the public method instead
+                parent.update_theme_for_all_pages()
+                break
+            elif hasattr(parent, '_update_all_pages_theme'):
+                # Fallback to old method if new one doesn't exist
+                try:
+                    parent._update_all_pages_theme()
+                except Exception:
+                    pass
+                break
+            parent = parent.parent()
     
     def _check_for_updates_background(self) -> None:
         """Check for updates in background without blocking UI."""

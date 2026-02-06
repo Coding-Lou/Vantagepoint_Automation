@@ -25,6 +25,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_task_page import BaseTaskPage
+from ui.utils.theme_colors import ThemeColors
 from workers.ar_worker import ARWorker
 import tools.util as util_module
 import tools.config_manager as config_manager
@@ -61,7 +62,7 @@ class ARTaskPage(BaseTaskPage):
             "4. Click 'Execute' to generate and send AR statement emails."
         )
         tutorial_text.setWordWrap(True)
-        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;")
+        tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
         
         # Spacer
@@ -82,13 +83,13 @@ class ARTaskPage(BaseTaskPage):
                 line.setReadOnly(True)
         except Exception:
             pass
-        self.date_edit.setStyleSheet("""
-            QDateEdit {
-                padding: 6px;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-            }
-        """)
+        self.date_edit.setStyleSheet(
+            f"""
+            QDateEdit {{
+                {ThemeColors.get_input_style()}
+            }}
+            """
+        )
         self.config_layout.addWidget(self.date_edit)
         
         # Spacer
@@ -145,13 +146,13 @@ class ARTaskPage(BaseTaskPage):
         self.mail_body_edit.setMaximumHeight(100)
         self.mail_body_edit.setPlaceholderText("Enter email body HTML content...")
         self.mail_body_edit.setReadOnly(True)
-        self.mail_body_edit.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 6px;
-            }
-        """)
+        self.mail_body_edit.setStyleSheet(
+            f"""
+            QTextEdit {{
+                {ThemeColors.get_input_style()}
+            }}
+            """
+        )
         self.config_layout.addWidget(self.mail_body_edit)
         
         # Track edit mode

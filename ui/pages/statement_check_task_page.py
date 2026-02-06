@@ -21,6 +21,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_task_page import BaseTaskPage
+from ui.utils.theme_colors import ThemeColors
 from workers.statement_check_worker import StatementCheckWorker
 import tools.util as util_module
 
@@ -55,7 +56,7 @@ class StatementCheckTaskPage(BaseTaskPage):
             "3. Click 'Execute' to check the statement status for the invoices."
         )
         tutorial_text.setWordWrap(True)
-        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px;")
+        tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
         
         # Spacer
@@ -67,23 +68,29 @@ class StatementCheckTaskPage(BaseTaskPage):
         self.config_layout.addWidget(client_label)
         
         self.client_combo = QComboBox()
-        self.client_combo.setStyleSheet("""
-            QComboBox {
+        bg = ThemeColors.background_input()
+        text = ThemeColors.text_primary()
+        border = ThemeColors.border_primary()
+        arrow_color = ThemeColors.text_secondary()
+        self.client_combo.setStyleSheet(f"""
+            QComboBox {{
                 padding: 6px;
-                border: 1px solid #d0d0d0;
+                border: 1px solid {border};
                 border-radius: 4px;
-            }
-            QComboBox::drop-down {
+                background-color: {bg};
+                color: {text};
+            }}
+            QComboBox::drop-down {{
                 border: none;
                 padding-right: 8px;
-            }
-            QComboBox::down-arrow {
+            }}
+            QComboBox::down-arrow {{
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 4px solid #666;
+                border-top: 4px solid {arrow_color};
                 margin-right: 4px;
-            }
+            }}
         """)
         
         # Load clients from config
@@ -100,13 +107,13 @@ class StatementCheckTaskPage(BaseTaskPage):
         
         self.invoice_edit = LineEdit()
         self.invoice_edit.setPlaceholderText("INV001, INV002, INV003 (comma-separated)")
-        self.invoice_edit.setStyleSheet("""
-            LineEdit {
-                padding: 6px;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-            }
-        """)
+        self.invoice_edit.setStyleSheet(
+            f"""
+            LineEdit {{
+                {ThemeColors.get_input_style()}
+            }}
+            """
+        )
         self.config_layout.addWidget(self.invoice_edit)
     
     def _load_clients(self) -> None:

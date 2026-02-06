@@ -54,8 +54,8 @@ except Exception:
     pass
 #endregion
 
-from PySide6.QtCore import Signal, Slot, Qt, QRect
-from PySide6.QtGui import QFont, QIcon, QPainter, QBrush, QColor
+from PySide6.QtCore import Signal, Slot, Qt, QRect, QEvent, QTimer
+from PySide6.QtGui import QFont, QIcon, QPainter, QBrush, QColor, QPalette, QShowEvent
 
 #region agent log
 try:
@@ -118,6 +118,7 @@ from ui.pages.base_task_page import BaseTaskPage
 from ui.pages.scheduled_tasks_page import ScheduledTasksPage
 from ui.services.app_context import get_app_context
 from ui.widgets.login_dialog import LoginDialog
+from ui.utils.theme_colors import ThemeColors
 from workers.base_worker import BaseWorker
 from workers.check_login_worker import CheckLoginWorker
 from workers.login_worker import LoginWorker
@@ -322,6 +323,7 @@ class MainWindow(FluentWindow):
         self.app_context = get_app_context()
         self.current_worker: Optional[BaseWorker] = None
         self.task_pages: Dict[str, BaseTaskPage] = {}
+        self._initialization_complete = False  # Flag to track initialization status
         
         # Base size for proportional font scaling
         self._font_base_size = (1200, 800)
@@ -341,6 +343,9 @@ class MainWindow(FluentWindow):
         
         # Apply initial font scaling
         #self._apply_font_scale()
+        
+        # Mark initialization as complete
+        self._initialization_complete = True
         
         self._report_progress(90, "Ready")
         
@@ -383,6 +388,13 @@ class MainWindow(FluentWindow):
         self.navigationInterface.setMinimumExpandWidth(300)
         
         self.stackedWidget.setContentsMargins(0, 0, 0, 0)
+        
+        # Apply theme-aware background to stacked widget (with error handling)
+        try:
+            self._apply_stacked_widget_style()
+        except Exception:
+            # Silently ignore errors during initialization
+            pass
         
         # Keep default paint behavior to avoid visual artifacts
         
@@ -794,3 +806,116 @@ class MainWindow(FluentWindow):
             return
         self.avatar_widget._load_avatar()
         self.avatar_widget.update()
+    
+    def _apply_stacked_widget_style(self) -> None:
+        """Apply theme-aware background to stacked widget."""
+        try:
+            if not hasattr(self, 'stackedWidget') or not self.stackedWidget:
+                return
+            bg = ThemeColors.background_primary()
+            text = ThemeColors.text_primary()
+            self.stackedWidget.setStyleSheet(f"""
+                QStackedWidget {{
+                    background-color: {bg};
+                    color: {text};
+                }}
+            """)
+            # Set palette for proper color inheritance
+            palette = self.stackedWidget.palette()
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(text))
+            palette.setColor(QPalette.ColorRole.Window, QColor(bg))
+            palette.setColor(QPalette.ColorRole.Base, QColor(bg))
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor(bg))
+            self.stackedWidget.setPalette(palette)
+        except Exception:
+            # Silently ignore errors to prevent crashes during initialization
+            pass
+    
+    def _update_all_pages_theme(self) -> None:
+        """Update theme styles for all pages."""
+        # Check if initialization is complete
+        if not hasattr(self, '_initialization_complete') or not self._initialization_complete:
+            return
+        
+        if not hasattr(self, 'task_pages'):
+            return
+        
+        try:
+            # Update stacked widget style
+            if hasattr(self, 'stackedWidget') and self.stackedWidget:
+                self._apply_stacked_widget_style()
+            
+            # Update all task pages
+            if hasattr(self, 'task_pages') and self.task_pages:
+                for page in self.task_pages.values():
+                    try:
+                        if hasattr(page, '_apply_page_background'):
+                            page._apply_page_background()
+                        if hasattr(page, '_apply_scroll_area_style'):
+                            page._apply_scroll_area_style()
+                        if hasattr(page, '_apply_content_widget_style'):
+                            page._apply_content_widget_style()
+                        if hasattr(page, '_apply_log_viewer_style'):
+                            page._apply_log_viewer_style()
+                    except Exception:
+                        # Silently ignore errors for individual pages
+                        pass
+            
+            # Update home page if it exists
+            if hasattr(self, 'stackedWidget') and self.stackedWidget.count() > 0:
+                try:
+                    home_page = self.stackedWidget.widget(0)
+                    if home_page and hasattr(home_page, '_apply_theme_styles'):
+                        home_page._apply_theme_styles()
+                except Exception:
+                    # Silently ignore errors for home page
+                    pass
+        except Exception:
+            # Silently ignore errors during theme update to prevent crashes
+            pass
+    
+    def changeEvent(self, event: QEvent) -> None:
+        """
+        Handle change events, including theme changes.
+        
+        Args:
+            event: Change event
+        """
+        super().changeEvent(event)
+        # Temporarily disable automatic theme updates in changeEvent to prevent crashes
+        # Theme updates will be handled explicitly when user switches theme
+        # This prevents crashes during initialization
+        pass
+    
+    def update_theme_for_all_pages(self) -> None:
+        """
+        Public method to update theme for all pages.
+        Called explicitly when user switches theme.
+        """
+        try:
+            if hasattr(self, '_initialization_complete') and self._initialization_complete:
+                # Update stacked widget style
+                self._apply_stacked_widget_style()
+                
+                # Update current visible page
+                current_widget = self.stackedWidget.currentWidget()
+                if current_widget:
+                    # Trigger showEvent to apply theme styles
+                    if hasattr(current_widget, 'showEvent'):
+                        try:
+                            current_widget.showEvent(QShowEvent())
+                        except Exception:
+                            pass
+                
+                # Update all task pages (they will update when shown)
+                if hasattr(self, 'task_pages') and self.task_pages:
+                    for page in self.task_pages.values():
+                        try:
+                            # Only update if page is visible
+                            if page.isVisible():
+                                page.showEvent(QShowEvent())
+                        except Exception:
+                            pass
+        except Exception:
+            # Silently ignore all errors
+            pass

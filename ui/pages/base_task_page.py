@@ -21,7 +21,8 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QScrollArea,
 )
-from PySide6.QtCore import Signal, Slot, Qt
+from PySide6.QtCore import Signal, Slot, Qt, QEvent
+from PySide6.QtGui import QPalette, QColor
 
 from qfluentwidgets import (
     PrimaryPushButton,
@@ -33,6 +34,7 @@ from qfluentwidgets import (
 )
 
 from workers.base_worker import BaseWorker
+from ui.utils.theme_colors import ThemeColors
 
 #region agent log
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -78,11 +80,19 @@ class BaseTaskPage(QWidget):
     task_finished = Signal(str, dict)  # task_id, result
     task_failed = Signal(str, str)  # task_id, error_message
     
-    # Log level colors
-    LOG_COLOR_INFO = "#d4d4d4"
-    LOG_COLOR_SUCCESS = "#4ec9b0"
-    LOG_COLOR_WARNING = "#dcdcaa"
-    LOG_COLOR_ERROR = "#f48771"
+    # Log level colors (use ThemeColors for consistency)
+    # These are accessed as methods to get current theme colors
+    def _get_log_color_info(self) -> str:
+        return ThemeColors.log_color_info()
+    
+    def _get_log_color_success(self) -> str:
+        return ThemeColors.log_color_success()
+    
+    def _get_log_color_warning(self) -> str:
+        return ThemeColors.log_color_warning()
+    
+    def _get_log_color_error(self) -> str:
+        return ThemeColors.log_color_error()
     
     def __init__(self, task_id: str, task_name: str, parent=None):
         """
@@ -97,6 +107,7 @@ class BaseTaskPage(QWidget):
         self.task_id = task_id
         self.task_name = task_name
         self.current_worker: Optional[BaseWorker] = None
+        self._ui_initialized = False  # Flag to track UI initialization
         #region agent log
         _agent_log(
             "H4",
@@ -107,28 +118,34 @@ class BaseTaskPage(QWidget):
         #endregion
         self._setup_ui()
         self._load_config()
+        self._ui_initialized = True  # Mark UI as initialized
     
     def _setup_ui(self) -> None:
         """Setup UI layout with modern Fluent Design."""
         root = QVBoxLayout(self)
         root.setContentsMargins(20, 20, 20, 20)
         root.setSpacing(12)
+        
+        # Apply theme-aware background to page
+        self._apply_page_background()
 
         # === Scrollable content (so Execute button is always visible) ===
         self._scroll = QScrollArea(self)
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._apply_scroll_area_style()
 
-        content = QWidget()
-        content_layout = QVBoxLayout(content)
+        self._content_widget = QWidget()
+        content_layout = QVBoxLayout(self._content_widget)
         content_layout.setContentsMargins(0, 0, 0, 0)
         content_layout.setSpacing(16)
+        self._apply_content_widget_style()
 
         # 1. Page header (title and description)
         self._setup_page_header(content_layout)
 
         # 2. Configuration area (Card-based)
-        self.config_card = CardWidget(content)
+        self.config_card = CardWidget(self._content_widget)
         self.config_layout = QVBoxLayout()
         self.config_layout.setContentsMargins(16, 16, 16, 16)
         self.config_layout.setSpacing(12)
@@ -139,7 +156,7 @@ class BaseTaskPage(QWidget):
         self._create_config_widgets()
 
         # 3. Log area (Card-based)
-        self.log_card = CardWidget(content)
+        self.log_card = CardWidget(self._content_widget)
         log_card_layout = QVBoxLayout()
         log_card_layout.setContentsMargins(16, 16, 16, 16)
         log_card_layout.setSpacing(12)
@@ -154,23 +171,14 @@ class BaseTaskPage(QWidget):
         self.log_viewer.setReadOnly(True)
         # Set minimum height for better log visibility
         self.log_viewer.setMinimumHeight(500)
-        self.log_viewer.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: #1e1e1e;
-                color: {self.LOG_COLOR_INFO};
-                font-family: 'Consolas', 'Courier New', monospace;
-                border: 1px solid #3c3c3c;
-                border-radius: 4px;
-                padding: 8px;
-            }}
-        """)
+        self._apply_log_viewer_style()
         log_card_layout.addWidget(self.log_viewer)
 
         # Log actions
         log_actions_layout = QHBoxLayout()
         log_actions_layout.addStretch()
 
-        clear_btn = PushButton("Clear Log", content)
+        clear_btn = PushButton("Clear Log", self._content_widget)
         clear_btn.clicked.connect(self.log_viewer.clear)
         log_actions_layout.addWidget(clear_btn)
 
@@ -181,7 +189,7 @@ class BaseTaskPage(QWidget):
         # Spacer so the bottom of scroll content isn't glued to the action bar
         content_layout.addStretch(1)
 
-        self._scroll.setWidget(content)
+        self._scroll.setWidget(self._content_widget)
         root.addWidget(self._scroll, stretch=1)
 
         # === Fixed action bar (always visible) ===
@@ -218,7 +226,7 @@ class BaseTaskPage(QWidget):
         if description:
             desc_label = BodyLabel(description)
             desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("color: #808080;")
+            desc_label.setStyleSheet(f"color: {ThemeColors.text_muted()};")
             parent_layout.addWidget(desc_label)
     
     def _get_page_description(self) -> str:
@@ -526,12 +534,12 @@ class BaseTaskPage(QWidget):
         
         # Get color based on level
         color_map = {
-            "INFO": self.LOG_COLOR_INFO,
-            "SUCCESS": self.LOG_COLOR_SUCCESS,
-            "WARNING": self.LOG_COLOR_WARNING,
-            "ERROR": self.LOG_COLOR_ERROR,
+            "INFO": self._get_log_color_info(),
+            "SUCCESS": self._get_log_color_success(),
+            "WARNING": self._get_log_color_warning(),
+            "ERROR": self._get_log_color_error(),
         }
-        color = color_map.get(level, self.LOG_COLOR_INFO)
+        color = color_map.get(level, self._get_log_color_info())
         
         # Format message
         formatted_msg = f'<span style="color: {color}">[{timestamp}] [{level}] {message}</span><br>'
@@ -552,3 +560,131 @@ class BaseTaskPage(QWidget):
         """
         self.execute_btn.setEnabled(enabled)
         self.cancel_btn.setEnabled(not enabled)
+    
+    def _apply_page_background(self) -> None:
+        """Apply theme-aware background to the page."""
+        try:
+            bg = ThemeColors.background_primary()
+            text = ThemeColors.text_primary()
+            # Apply background and text color to the page widget itself
+            # Use object name selector to avoid affecting child widgets
+            self.setObjectName("base_task_page")
+            self.setStyleSheet(f"""
+                QWidget#base_task_page {{
+                    background-color: {bg};
+                    color: {text};
+                }}
+            """)
+            # Set palette for proper text color inheritance
+            try:
+                palette = self.palette()
+                palette.setColor(QPalette.ColorRole.WindowText, QColor(text))
+                palette.setColor(QPalette.ColorRole.Window, QColor(bg))
+                palette.setColor(QPalette.ColorRole.Base, QColor(bg))
+                palette.setColor(QPalette.ColorRole.AlternateBase, QColor(bg))
+                self.setPalette(palette)
+            except Exception:
+                # Silently ignore palette errors
+                pass
+        except Exception:
+            # Silently ignore errors to prevent crashes
+            pass
+    
+    def _apply_scroll_area_style(self) -> None:
+        """Apply theme-aware style to scroll area."""
+        try:
+            if not hasattr(self, '_scroll') or not self._scroll:
+                return
+            bg = ThemeColors.background_primary()
+            text = ThemeColors.text_primary()
+            self._scroll.setStyleSheet(f"""
+                QScrollArea {{
+                    background-color: {bg};
+                    border: none;
+                }}
+                QScrollArea > QWidget > QWidget {{
+                    background-color: {bg};
+                    color: {text};
+                }}
+            """)
+            # Also set viewport background explicitly
+            try:
+                viewport = self._scroll.viewport()
+                if viewport:
+                    viewport.setStyleSheet(f"""
+                        background-color: {bg};
+                        color: {text};
+                    """)
+                    # Set palette for viewport with error handling
+                    try:
+                        palette = viewport.palette()
+                        palette.setColor(QPalette.ColorRole.WindowText, QColor(text))
+                        palette.setColor(QPalette.ColorRole.Window, QColor(bg))
+                        palette.setColor(QPalette.ColorRole.Base, QColor(bg))
+                        viewport.setPalette(palette)
+                    except Exception:
+                        # Silently ignore palette errors
+                        pass
+            except Exception:
+                # Silently ignore viewport errors
+                pass
+        except Exception:
+            # Silently ignore all errors to prevent crashes
+            pass
+    
+    def _apply_content_widget_style(self) -> None:
+        """Apply theme-aware style to content widget."""
+        try:
+            if hasattr(self, '_content_widget') and self._content_widget:
+                bg = ThemeColors.background_primary()
+                text = ThemeColors.text_primary()
+                self._content_widget.setStyleSheet(f"""
+                    background-color: {bg};
+                    color: {text};
+                """)
+        except Exception:
+            # Silently ignore errors to prevent crashes
+            pass
+    
+    def _apply_log_viewer_style(self) -> None:
+        """Apply theme-aware style to log viewer."""
+        try:
+            if hasattr(self, 'log_viewer') and self.log_viewer:
+                self.log_viewer.setStyleSheet(ThemeColors.get_log_viewer_style())
+        except Exception:
+            # Silently ignore errors to prevent crashes
+            pass
+    
+    def showEvent(self, event) -> None:
+        """
+        Handle show event - apply theme styles when page becomes visible.
+        
+        Args:
+            event: Show event
+        """
+        super().showEvent(event)
+        # Apply theme styles when page is shown (only if UI is initialized)
+        if hasattr(self, '_ui_initialized') and self._ui_initialized:
+            try:
+                # Check if components exist before applying styles
+                if hasattr(self, '_scroll') and hasattr(self, '_content_widget'):
+                    self._apply_page_background()
+                    self._apply_scroll_area_style()
+                    self._apply_content_widget_style()
+                    self._apply_log_viewer_style()
+            except Exception:
+                # Silently ignore errors to prevent crashes
+                pass
+    
+    def changeEvent(self, event: QEvent) -> None:
+        """
+        Handle change events, including theme changes.
+        
+        Args:
+            event: Change event
+        """
+        super().changeEvent(event)
+        # Completely disable automatic theme updates in changeEvent to prevent crashes
+        # Theme updates will be handled in showEvent when page becomes visible
+        # This prevents crashes during page switching
+        pass

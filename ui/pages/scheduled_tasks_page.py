@@ -49,6 +49,8 @@ from qfluentwidgets import (
     LineEdit,
 )
 
+from ui.utils.theme_colors import ThemeColors
+
 import tools.schedule_task as schedule_task_module
 import tools.util as util_module
 import tools.login as login_module
@@ -346,7 +348,8 @@ class TaskEditDialog(QDialog):
         # Executable (read-only, for reference)
         self.exe_edit = LineEdit()
         self.exe_edit.setReadOnly(True)
-        self.exe_edit.setStyleSheet("background-color: #f5f5f5;")
+        bg = ThemeColors.background_tutorial()
+        self.exe_edit.setStyleSheet(f"background-color: {bg};")
         general_layout.addRow("Executable:", self.exe_edit)
         
         # Arguments
@@ -576,7 +579,7 @@ class ScheduledTasksPage(QWidget):
         
         desc = BodyLabel("Manage scheduled task configurations and execute tasks manually.")
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #808080;")
+        desc.setStyleSheet(f"color: {ThemeColors.text_muted()};")
         root.addWidget(desc)
         
         # Scrollable content
@@ -638,16 +641,7 @@ class ScheduledTasksPage(QWidget):
         self.log_viewer = QTextEdit()
         self.log_viewer.setReadOnly(True)
         self.log_viewer.setMinimumHeight(200)
-        self.log_viewer.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                font-family: 'Consolas', 'Courier New', monospace;
-                border: 1px solid #3c3c3c;
-                border-radius: 4px;
-                padding: 8px;
-            }
-        """)
+        self.log_viewer.setStyleSheet(ThemeColors.get_log_viewer_style())
         log_layout.addWidget(self.log_viewer)
         
         log_actions = QHBoxLayout()
@@ -808,12 +802,12 @@ class ScheduledTasksPage(QWidget):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         color_map = {
-            "INFO": "#d4d4d4",
-            "SUCCESS": "#4ec9b0",
-            "WARNING": "#dcdcaa",
-            "ERROR": "#f48771",
+            "INFO": ThemeColors.log_color_info(),
+            "SUCCESS": ThemeColors.log_color_success(),
+            "WARNING": ThemeColors.log_color_warning(),
+            "ERROR": ThemeColors.log_color_error(),
         }
-        color = color_map.get(level, "#d4d4d4")
+        color = color_map.get(level, ThemeColors.log_color_info())
         
         formatted_msg = f'<span style="color: {color}">[{timestamp}] [{level}] {message}</span><br>'
         self.log_viewer.append(formatted_msg)

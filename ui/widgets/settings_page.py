@@ -28,6 +28,7 @@ from qfluentwidgets import (
 
 import tools.config_manager as config_manager
 from ui.widgets.json_tree_editor import JsonTreeEditor
+from ui.utils.theme_colors import ThemeColors
 
 
 class SettingsPage(QWidget):
@@ -91,7 +92,7 @@ class SettingsPage(QWidget):
         # Description
         desc = BodyLabel("View and edit application configuration. Click 'Edit' to modify settings.")
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #808080;")
+        desc.setStyleSheet(f"color: {ThemeColors.text_muted()};")
         root.addWidget(desc)
         
         # Scrollable content

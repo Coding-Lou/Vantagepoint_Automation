@@ -15,6 +15,8 @@ from qfluentwidgets import (
     CardWidget,
 )
 
+from ui.utils.theme_colors import ThemeColors
+
 
 class LoginDialog(QDialog):
     """
@@ -50,7 +52,7 @@ class LoginDialog(QDialog):
         )
         desc_label.setWordWrap(True)
         desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setStyleSheet("color: #808080;")
+        desc_label.setStyleSheet(f"color: {ThemeColors.text_muted()};")
         
         # Progress indicator (hidden initially)
         self.progress_ring = IndeterminateProgressRing(self)
@@ -100,11 +102,11 @@ class LoginDialog(QDialog):
         if message:
             self.status_label.setText(message)
             if "error" in message.lower() or "failed" in message.lower():
-                self.status_label.setStyleSheet("color: #f44336;")  # Red
+                self.status_label.setStyleSheet(f"color: {ThemeColors.status_error()};")
             elif "success" in message.lower():
-                self.status_label.setStyleSheet("color: #4caf50;")  # Green
+                self.status_label.setStyleSheet(f"color: {ThemeColors.status_success()};")
             else:
-                self.status_label.setStyleSheet("color: #808080;")  # Gray
+                self.status_label.setStyleSheet(f"color: {ThemeColors.text_muted()};")
     
     def show_success(self) -> None:
         """Show success message and close dialog."""
