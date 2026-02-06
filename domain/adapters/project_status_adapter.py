@@ -48,6 +48,7 @@ class ProjectStatusAdapter(BaseAdapter):
     def execute(
         self,
         period: str,
+        use_filter: bool,
         project_names: str
     ) -> Dict[str, Any]:
         """
@@ -55,7 +56,8 @@ class ProjectStatusAdapter(BaseAdapter):
         
         Args:
             period: Accounting period in YYYYMM format (e.g., 202607)
-            project_names: Comma-separated project names string
+            use_filter: If True, filter by charge type (Regular) and created date; if False, use manual project names
+            project_names: Comma-separated project names string (only used when use_filter is False)
             
         Returns:
             Result dictionary with success status and output file path
@@ -68,6 +70,7 @@ class ProjectStatusAdapter(BaseAdapter):
                 "Project Status adapter execute called",
                 {
                     "has_period": bool(period),
+                    "use_filter": use_filter,
                     "has_projects": bool(project_names),
                 },
             )
@@ -77,7 +80,6 @@ class ProjectStatusAdapter(BaseAdapter):
                 # Log start
                 if self.log_callback:
                     self.log_callback("INFO", f"Starting project status report generation for period: {period}")
-                    self.log_callback("INFO", f"Projects: {project_names}")
                 
                 # CRITICAL: Update HEADERS in ps_module to ensure fresh authentication
                 ps_module.HEADERS = util_module.set_headers()
@@ -89,19 +91,56 @@ class ProjectStatusAdapter(BaseAdapter):
                     self.log_callback("INFO", f"Setting accounting period to: {period}")
                 util_module.change_period(period)
                 
-                # Parse project names
-                projects = [p.strip() for p in project_names.split(",") if p.strip()]
-                if not projects:
-                    return {
-                        "success": False,
-                        "message": "No valid project names provided"
-                    }
-                
-                if self.log_callback:
-                    self.log_callback("INFO", f"Processing {len(projects)} project(s): {', '.join(projects)}")
-                
-                # Assemble projects (this sets the global searchOptions)
-                ps_module.searchOptions = util_module.assamble_projects(projects)
+                # Determine filter mode and set searchOptions accordingly
+                projects = []
+                if use_filter:
+                    # Filter by charge type (Regular) and created date
+                    from datetime import date
+                    current_year = date.today().year
+                    start_date = f"{current_year - 3}-01-01T00:00:00"
+                    ps_module.searchOptions = [
+                        {
+                            "name": "CreateDate",
+                            "value": start_date,
+                            "type": "datetime",
+                            "seq": 1,
+                            "tableName": "PR",
+                            "opp": ">",
+                            "condition": "and",
+                            "searchLevel": 1,
+                            "valueDescription": ""
+                        },
+                        {
+                            "name": "ChargeType",
+                            "value": "R",
+                            "type": "dropdown",
+                            "seq": 2,
+                            "tableName": "PR",
+                            "condition": "and",
+                            "searchLevel": 1,
+                            "valueDescription": "Regular"
+                        }
+                    ]
+                    if self.log_callback:
+                        self.log_callback("INFO", f"Using filter mode: charge type (Regular) and created date after {start_date}")
+                else:
+                    # Manual project input mode
+                    if self.log_callback:
+                        self.log_callback("INFO", f"Projects: {project_names}")
+                    
+                    # Parse project names
+                    projects = [p.strip() for p in project_names.split(",") if p.strip()]
+                    if not projects:
+                        return {
+                            "success": False,
+                            "message": "No valid project names provided"
+                        }
+                    
+                    if self.log_callback:
+                        self.log_callback("INFO", f"Processing {len(projects)} project(s): {', '.join(projects)}")
+                    
+                    # Assemble projects (this sets the global searchOptions)
+                    ps_module.searchOptions = util_module.assamble_projects(projects)
                 
                 # Ensure project status folder exists
                 import os
@@ -135,7 +174,13 @@ class ProjectStatusAdapter(BaseAdapter):
 
                 if self.log_callback:
                     self.log_callback("INFO", "Downloading Purchase Orders...")
-                ps_module.download_purchase_orders(projects)
+                # Only download purchase orders if we have projects (manual mode)
+                # Purchase orders require specific project names, so skip if using filter mode
+                if projects:
+                    ps_module.download_purchase_orders(projects)
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping purchase orders (filter mode - no specific projects)")
 
                 if self.log_callback:
                     self.log_callback("INFO", "Downloading Office Earnings...")

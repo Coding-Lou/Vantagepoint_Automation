@@ -37,6 +37,7 @@ from qfluentwidgets import (
     LineEdit,
     PlainTextEdit,
     CardWidget,
+    isDarkTheme,
 )
 
 
@@ -202,6 +203,34 @@ class JsonTreeEditor(QWidget):
             return
         
         menu = QMenu(self)
+        
+        # Apply theme-aware menu style to avoid white-on-white text in dark mode
+        if isDarkTheme():
+            menu.setStyleSheet(
+                """
+                QMenu {
+                    background-color: #2d2d2d;
+                    color: #f0f0f0;
+                    border: 1px solid #3c3c3c;
+                }
+                QMenu::item:selected {
+                    background-color: #3c3c3c;
+                }
+                """
+            )
+        else:
+            menu.setStyleSheet(
+                """
+                QMenu {
+                    background-color: #ffffff;
+                    color: #000000;
+                    border: 1px solid #d0d0d0;
+                }
+                QMenu::item:selected {
+                    background-color: #e5e5e5;
+                }
+                """
+            )
         
         # Edit action
         edit_action = QAction("Edit", self)

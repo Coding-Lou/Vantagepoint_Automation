@@ -55,7 +55,7 @@ class StatementCheckTaskPage(BaseTaskPage):
             "3. Click 'Execute' to check the statement status for the invoices."
         )
         tutorial_text.setWordWrap(True)
-        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px; background-color: #f5f5f5; border-radius: 4px;")
+        tutorial_text.setStyleSheet("color: #666; font-size: 12px; padding: 8px;")
         self.config_layout.addWidget(tutorial_text)
         
         # Spacer
@@ -72,7 +72,6 @@ class StatementCheckTaskPage(BaseTaskPage):
                 padding: 6px;
                 border: 1px solid #d0d0d0;
                 border-radius: 4px;
-                background-color: white;
             }
             QComboBox::drop-down {
                 border: none;

@@ -429,7 +429,7 @@ def download_with_progress(url, save_path, latest_version):
     downloaded = 0
     chunk_size = 8192
 
-    print("\nDownloading update...\n")  # 只终端显示
+    print("\nDownloading update...\n") 
 
     with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size):

@@ -72,7 +72,8 @@ class ProjectStatusWorker(BaseWorker):
             
             result = self.adapter.execute(
                 period=self.params.get("period"),
-                project_names=self.params.get("project_names")
+                use_filter=self.params.get("use_filter", False),
+                project_names=self.params.get("project_names", "")
             )
             #region agent log
             _agent_log_local("ProjectStatusWorker execute result", {"success": bool(result.get("success"))})

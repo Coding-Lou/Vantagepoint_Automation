@@ -372,7 +372,7 @@ class MainWindow(FluentWindow):
         
         # Set Fluent theme
         try:
-            setTheme(Theme.AUTO)
+            setTheme(Theme.LIGHT)
         except Exception as e:
             _agent_log("H6", "MainWindow.__init__", "Failed to set theme", {"error": str(e)})
 

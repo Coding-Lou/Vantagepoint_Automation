@@ -342,6 +342,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     util.init_workdir()
+
     exit_code = main()
     if exit_code == 0 and not any(
         arg in sys.argv for arg in ["--ap", "--ar", "--project_status", "--bridge", 

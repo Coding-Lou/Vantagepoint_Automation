@@ -282,6 +282,7 @@ def download_purchase_orders(projects):
         with open(csvName, "w", newline="", encoding="utf-8-sig") as f:
             writer = None
             for project in projects:
+                project = util.cleanup_projectID(project)
                 url = (
                     f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/"
                     f"projectreview/{project}/PurchaseOrders?Closed=N&POStatus="
@@ -290,9 +291,10 @@ def download_purchase_orders(projects):
                 po_data = response.json()
 
                 if len(po_data) == 0:
-                    print(f"⚠️ No open purchase orders for project {project}")
+                    #print(f"⚠️ No open purchase orders for project {project}")
                     continue
 
+                print(project + ": " + str(len(po_data)) + " purchase orders found")
                 for row in po_data:
                     row["Project_Number"] = project
 
@@ -386,14 +388,18 @@ def main():
     period = input("Please input the period (202607): ")
     util.change_period(period)
     
-    userInput = input("Project Name(s) (use commas to separate multiple entries): " )
-    projects = [p.strip() for p in userInput.split(",") if p.strip()]
-
-    if not projects:
-        print("Error: Please enter at least one project name.")
-        return
-    
-    searchOptions = util.assamble_projects(projects)
+    currentYear = date.today().year
+    userInput = input(f"Do you want to filter by charge type is regular and created after {currentYear-3}.01.01? (Y/N): ")
+    if userInput == "Y":
+        startDate = f"{currentYear-3}-01-01T00:00:00"
+        searchOptions = [{"name":"CreateDate","value":startDate,"type":"datetime","seq":1,"tableName":"PR","opp":">","condition":"and","searchLevel":1,"valueDescription":""},{"name":"ChargeType","value":"R","type":"dropdown","seq":2,"tableName":"PR","condition":"and","searchLevel":1,"valueDescription":"Regular"}]
+    else:
+        userInput = input("Project Name(s) (use commas to separate multiple entries): " )
+        projects = [p.strip() for p in userInput.split(",") if p.strip()]
+        if not projects:
+            print("Error: Please enter at least one project name.")
+            return
+        searchOptions = util.assamble_projects(projects)
     
     util.check_folder("project status")
     util.clear_folder("project status")

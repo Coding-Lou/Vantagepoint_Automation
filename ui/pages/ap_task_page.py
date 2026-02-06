@@ -23,6 +23,7 @@ from qfluentwidgets import (
     PrimaryPushButton,
     PushButton,
     FluentIcon,
+    isDarkTheme,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
@@ -109,13 +110,8 @@ class APTaskPage(BaseTaskPage):
                 line.setReadOnly(True)
         except Exception:
             pass
-        self.date_edit.setStyleSheet("""
-            QDateEdit {
-                padding: 6px;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-            }
-        """)
+        # Apply theme-aware style to date picker
+        self._apply_date_edit_style()
         self.config_layout.addWidget(self.date_edit)
         
         # Spacer
@@ -172,17 +168,58 @@ class APTaskPage(BaseTaskPage):
         self.mail_body_edit.setMaximumHeight(100)
         self.mail_body_edit.setPlaceholderText("Enter email body HTML content...")
         self.mail_body_edit.setReadOnly(True)
-        self.mail_body_edit.setStyleSheet("""
-            QTextEdit {
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 6px;
-            }
-        """)
+        # Apply theme-aware style to mail body editor
+        self._apply_mail_body_style()
         self.config_layout.addWidget(self.mail_body_edit)
         
         # Track edit mode
         self.email_edit_mode = False
+    
+    def _apply_date_edit_style(self) -> None:
+        """Apply theme-aware style to date picker."""
+        if isDarkTheme():
+            border_color = "#3c3c3c"
+            bg_color = "#202020"
+            text_color = "#f0f0f0"
+        else:
+            border_color = "#d0d0d0"
+            bg_color = "#ffffff"
+            text_color = "#000000"
+
+        self.date_edit.setStyleSheet(
+            f"""
+            QDateEdit {{
+                padding: 6px;
+                border: 1px solid {border_color};
+                border-radius: 4px;
+                background-color: {bg_color};
+                color: {text_color};
+            }}
+            """
+        )
+
+    def _apply_mail_body_style(self) -> None:
+        """Apply theme-aware style to mail body editor."""
+        if isDarkTheme():
+            border_color = "#3c3c3c"
+            bg_color = "#202020"
+            text_color = "#f0f0f0"
+        else:
+            border_color = "#d0d0d0"
+            bg_color = "#ffffff"
+            text_color = "#000000"
+
+        self.mail_body_edit.setStyleSheet(
+            f"""
+            QTextEdit {{
+                border: 1px solid {border_color};
+                border-radius: 4px;
+                padding: 6px;
+                background-color: {bg_color};
+                color: {text_color};
+            }}
+            """
+        )
     
     def _load_config(self) -> None:
         """Load configuration from config file."""

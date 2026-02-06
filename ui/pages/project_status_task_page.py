@@ -9,8 +9,11 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QComboBox,
+    QRadioButton,
+    QButtonGroup,
 )
 from PySide6.QtCore import Qt
+from datetime import date
 
 from qfluentwidgets import (
     LineEdit,
@@ -22,6 +25,7 @@ from qfluentwidgets import (
 
 from ui.pages.base_task_page import BaseTaskPage
 from workers.project_status_worker import ProjectStatusWorker
+from ui.services.app_context import get_app_context
 import tools.util as util_module
 import core.project_status as ps_module
 
@@ -42,6 +46,10 @@ class ProjectStatusTaskPage(BaseTaskPage):
             "Project Status",
             parent
         )
+        
+        # Connect to login state changes to reload periods when user logs in
+        app_context = get_app_context()
+        app_context.login_state_changed.connect(self._on_login_state_changed)
     
     def _get_page_description(self) -> str:
         """Get page description."""
@@ -56,7 +64,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
         
         tutorial_text = BodyLabel(
             "1. Select an accounting period from the dropdown menu.\n"
-            "2. Enter project name(s) separated by commas (e.g., Project1, Project2, Project3).\n"
+            "2. Choose to filter by charge type and created date, or manually enter project names.\n"
             "3. Click 'Execute' to generate the project status report."
         )
         tutorial_text.setWordWrap(True)
@@ -99,10 +107,63 @@ class ProjectStatusTaskPage(BaseTaskPage):
         # Spacer
         self.config_layout.addSpacing(12)
         
-        # Project names section
-        projects_label = BodyLabel("Project Name(s)")
-        projects_label.setStyleSheet("font-weight: 600; font-size: 13px;")
-        self.config_layout.addWidget(projects_label)
+        # Filter mode selection section
+        filter_mode_label = BodyLabel("Filter Mode")
+        filter_mode_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self.config_layout.addWidget(filter_mode_label)
+        
+        # Create button group for radio buttons
+        self.filter_mode_group = QButtonGroup(self)
+        
+        # Calculate the date for filter option
+        current_year = date.today().year
+        filter_date = f"{current_year - 3}-01-01"
+        
+        # Option 1: Filter by charge type and created date
+        self.filter_radio = QRadioButton(
+            f"Filter by charge type (Regular) and created date (after {filter_date})"
+        )
+        self.filter_radio.setChecked(False)
+        self.filter_radio.setStyleSheet("""
+            QRadioButton {
+                padding: 4px;
+                font-size: 12px;
+            }
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+            }
+        """)
+        self.filter_mode_group.addButton(self.filter_radio, 0)
+        self.config_layout.addWidget(self.filter_radio)
+        
+        # Option 2: Manual project input
+        self.manual_radio = QRadioButton("Manually enter project names")
+        self.manual_radio.setChecked(True)  # Default to manual input
+        self.manual_radio.setStyleSheet("""
+            QRadioButton {
+                padding: 4px;
+                font-size: 12px;
+            }
+            QRadioButton::indicator {
+                width: 16px;
+                height: 16px;
+            }
+        """)
+        self.filter_mode_group.addButton(self.manual_radio, 1)
+        self.config_layout.addWidget(self.manual_radio)
+        
+        # Connect radio buttons to show/hide project input
+        self.filter_radio.toggled.connect(self._on_filter_mode_changed)
+        self.manual_radio.toggled.connect(self._on_filter_mode_changed)
+        
+        # Spacer
+        self.config_layout.addSpacing(12)
+        
+        # Project names section (initially visible)
+        self.projects_label = BodyLabel("Project Name(s)")
+        self.projects_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self.config_layout.addWidget(self.projects_label)
         
         self.projects_edit = LineEdit()
         self.projects_edit.setPlaceholderText("Project1, Project2, Project3 (comma-separated)")
@@ -114,11 +175,27 @@ class ProjectStatusTaskPage(BaseTaskPage):
             }
         """)
         self.config_layout.addWidget(self.projects_edit)
+        
+        # Set initial visibility state (manual mode is default, so project input is visible)
+        self._on_filter_mode_changed()
     
     def _load_config(self) -> None:
         """Load configuration from config file (if any)."""
         # Project status doesn't have saved config, but we can load default period if available
         pass
+    
+    def _on_filter_mode_changed(self) -> None:
+        """Handle filter mode radio button change - show/hide project input."""
+        # Show project input only when manual mode is selected
+        is_manual_mode = self.manual_radio.isChecked()
+        self.projects_label.setVisible(is_manual_mode)
+        self.projects_edit.setVisible(is_manual_mode)
+    
+    def _on_login_state_changed(self, is_logged_in: bool) -> None:
+        """Handle login state change - reload periods when user logs in."""
+        if is_logged_in:
+            # User just logged in, reload periods
+            self._load_periods()
     
     def _load_periods(self) -> None:
         """Load periods from print_period() and populate the dropdown."""
@@ -140,7 +217,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
             # Populate dropdown with formatted display text
             for p in period_data:
                 display_text = f"{p['Period']} | From: {p['AccountPdStart'][:10]} To: {p['AccountPdEnd'][:10]}"
-                # Convert Period to string to ensure type compatibility
+                # Convert Period to string to ensure type compatibility with change_period() function
                 period_value = str(p['Period'])
                 
                 # Store mapping: display text -> Period value
@@ -177,14 +254,16 @@ class ProjectStatusTaskPage(BaseTaskPage):
         if current_text not in self.period_data_map:
             return False, "Invalid period selection"
         
-        projects = self.projects_edit.text().strip()
-        if not projects:
-            return False, "Please enter at least one project name"
-        
-        # Validate that there's at least one non-empty project name
-        project_list = [p.strip() for p in projects.split(",") if p.strip()]
-        if not project_list:
-            return False, "Please enter at least one valid project name"
+        # If manual mode is selected, validate project names
+        if self.manual_radio.isChecked():
+            projects = self.projects_edit.text().strip()
+            if not projects:
+                return False, "Please enter at least one project name"
+            
+            # Validate that there's at least one non-empty project name
+            project_list = [p.strip() for p in projects.split(",") if p.strip()]
+            if not project_list:
+                return False, "Please enter at least one valid project name"
         
         return True, ""
     
@@ -194,15 +273,18 @@ class ProjectStatusTaskPage(BaseTaskPage):
         current_text = self.period_combo.currentText()
         period = self.period_data_map.get(current_text, "")
         
-        # Ensure period is a string (convert if needed)
+        # Ensure period is a string (convert if needed for type safety)
         if period:
             period = str(period)
         
-        projects_text = self.projects_edit.text().strip()
+        # Determine filter mode
+        use_filter = self.filter_radio.isChecked()
+        projects_text = self.projects_edit.text().strip() if self.manual_radio.isChecked() else ""
         
         return {
             "period": period,
-            "project_names": projects_text,  # Comma-separated string
+            "use_filter": use_filter,  # True if filtering by charge type and created date
+            "project_names": projects_text,  # Comma-separated string (empty if use_filter is True)
         }
     
     def _create_worker(self, params: Dict[str, Any]) -> ProjectStatusWorker:

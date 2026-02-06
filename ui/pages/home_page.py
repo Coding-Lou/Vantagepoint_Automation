@@ -3,7 +3,7 @@ Home page (Dashboard) for the application.
 
 Displays overview, login status, recent tasks, and quick access buttons.
 """
-from typing import Optional
+from typing import Optional, Any
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
 from PySide6.QtCore import Qt, QTimer
 
@@ -15,6 +15,11 @@ from qfluentwidgets import (
     BodyLabel,
     TitleLabel,
     CaptionLabel,
+    HyperlinkButton,
+    IndeterminateProgressRing,
+    setTheme,
+    Theme,
+    isDarkTheme,
 )
 
 from ui.services.app_context import get_app_context
@@ -48,7 +53,7 @@ class HomePage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
         
-        # Title section with update button in top-right
+        # Title section with update button and theme toggle in top-right
         title_layout = QHBoxLayout()
         title_label = TitleLabel("QCA Accounting Automation Tool")
         title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -60,6 +65,13 @@ class HomePage(QWidget):
         self.update_btn.setMinimumHeight(36)
         self.update_btn.clicked.connect(self._on_check_update_clicked)
         title_layout.addWidget(self.update_btn)
+        
+        # Theme toggle button
+        self.theme_btn = PushButton(self._get_theme_button_text(), self, FluentIcon.BRUSH)
+        self.theme_btn.setMinimumHeight(36)
+        self.theme_btn.setToolTip(self._get_theme_tooltip())
+        self.theme_btn.clicked.connect(self._on_theme_toggle_clicked)
+        title_layout.addWidget(self.theme_btn)
         
         layout.addLayout(title_layout)
         
@@ -244,6 +256,26 @@ class HomePage(QWidget):
         # This will be connected in MainWindow to show login dialog
         if hasattr(self, '_trigger_login'):
             self._trigger_login()
+    
+    def _get_theme_button_text(self) -> str:
+        """Get theme button text based on current theme."""
+        return "Dark" if not isDarkTheme() else "Light"
+    
+    def _get_theme_tooltip(self) -> str:
+        """Get theme button tooltip based on current theme."""
+        return "Switch to light theme" if isDarkTheme() else "Switch to dark theme"
+    
+    def _on_theme_toggle_clicked(self) -> None:
+        """Handle theme toggle button click."""
+        # Toggle between dark and light theme
+        if isDarkTheme():
+            setTheme(Theme.LIGHT)
+        else:
+            setTheme(Theme.DARK)
+        
+        # Update button text and tooltip
+        self.theme_btn.setText(self._get_theme_button_text())
+        self.theme_btn.setToolTip(self._get_theme_tooltip())
     
     def _check_for_updates_background(self) -> None:
         """Check for updates in background without blocking UI."""
