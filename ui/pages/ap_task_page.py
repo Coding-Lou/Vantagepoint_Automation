@@ -6,9 +6,6 @@ Task: Generate AP remittance advice with email configuration.
 from typing import Dict, Any, Tuple, Optional
 
 from PySide6.QtWidgets import (
-    QLineEdit,
-    QTextEdit,
-    QLabel,
     QFormLayout,
     QHBoxLayout,
     QMessageBox,
@@ -19,11 +16,11 @@ from qfluentwidgets import (
     DatePicker,
     LineEdit,
     BodyLabel,
-    CardWidget,
     PrimaryPushButton,
     PushButton,
     FluentIcon,
     isDarkTheme,
+    TextEdit,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
@@ -164,11 +161,18 @@ class APTaskPage(BaseTaskPage):
         self.config_layout.addLayout(email_form)
         self.config_layout.addWidget(body_label)
         
-        self.mail_body_edit = QTextEdit()
+        self.mail_body_edit = TextEdit()
         self.mail_body_edit.setAcceptRichText(True)
-        self.mail_body_edit.setMaximumHeight(100)
+        self.mail_body_edit.setMaximumHeight(500)
         self.mail_body_edit.setPlaceholderText("Enter email body HTML content...")
         self.mail_body_edit.setReadOnly(True)
+        self.mail_body_edit.setStyleSheet(
+            f"""
+            TextEdit {{
+                {ThemeColors.get_input_style()}
+            }}
+            """
+        )
         # Apply theme-aware style to mail body editor
         self._apply_mail_body_style()
         self.config_layout.addWidget(self.mail_body_edit)
@@ -305,6 +309,11 @@ class APTaskPage(BaseTaskPage):
             self.mail_subject_edit.setReadOnly(False)
             self.mail_body_edit.setReadOnly(False)
             
+            # Switch to plain text mode to show HTML tags
+            # Get the original HTML source from config to display as plain text
+            html_source = util_module.get_config(["AP", "BODY"]) or ""
+            self.mail_body_edit.setPlainText(html_source)
+            
             # Update button states
             self.email_edit_btn.setEnabled(False)
             self.email_save_btn.setEnabled(True)
@@ -318,7 +327,10 @@ class APTaskPage(BaseTaskPage):
             mail_from = self.mail_from_edit.text()
             mail_cc = self.mail_cc_edit.text()
             mail_subject = self.mail_subject_edit.text()
-            mail_body = self.mail_body_edit.toHtml()
+            
+            # In edit mode, get the plain text (HTML source) that user edited
+            html_source = self.mail_body_edit.toPlainText()
+            mail_body = html_source
             
             # Save to config using config_manager
             updates = {
@@ -336,6 +348,10 @@ class APTaskPage(BaseTaskPage):
                 self.mail_cc_edit.setReadOnly(True)
                 self.mail_subject_edit.setReadOnly(True)
                 self.mail_body_edit.setReadOnly(True)
+                
+                # Switch back to HTML rendering mode (hide HTML tags)
+                # Set the HTML content to display rendered version
+                self.mail_body_edit.setHtml(mail_body)
                 
                 # Update button states
                 self.email_edit_btn.setEnabled(True)

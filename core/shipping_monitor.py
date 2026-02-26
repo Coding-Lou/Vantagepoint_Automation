@@ -5,6 +5,7 @@ from datetime import datetime, date
 from openpyxl import Workbook
 from zoneinfo import ZoneInfo
 import core.packing_slip as packing_slip
+from PyPDF2 import PdfReader, PdfWriter
 
 def get_master_key(po):
     try:
@@ -46,7 +47,7 @@ def download_packing_list(shippingData):
         response = requests.get(url, headers=HEADERS)
         nonce = response.json
 
-        url = f"https://qcadeltek03.qcasystems.com/vantagepoint/vision//PurchaseReceive/ReceiveDocumentsDetail/{shippingData["MasterPKey"]}%7C{shippingData["FileID"]}%7C{shippingData["DetailPKey"]}/Documents/{shippingData["FileID"]}?filename=&nonce={nonce}=&active_period="
+        url = f'https://qcadeltek03.qcasystems.com/vantagepoint/vision//PurchaseReceive/ReceiveDocumentsDetail/{shippingData["MasterPKey"]}%7C{shippingData["FileID"]}%7C{shippingData["DetailPKey"]}/Documents/{shippingData["FileID"]}?filename=&nonce={nonce}=&active_period='
         response = requests.get(url, headers=HEADERS)
 
         if response.status_code == 200:
@@ -56,22 +57,32 @@ def download_packing_list(shippingData):
                     if chunk:
                         f.write(chunk)
             #print("✅ "+ shippingData["FileName"] + " Downloaded")
+
+            reader = PdfReader(pdfName)
+            writer = PdfWriter()
+
+            if len(reader.pages) > 0:
+                writer.add_page(reader.pages[0])
+
+            with open(pdfName, "wb") as f:
+                writer.write(f)
         else:
             print(f"❌ Error")
     except Exception as e:
-        print(f"Downloading {shippingData["FileName"]} had error {e}")
+        print(f'Downloading {shippingData["FileName"]} had error {e}')
 
 def main():
     global HEADERS
     HEADERS = util.set_headers()
-    date = input("Please input the start date (format: 2025-04-01): ")
+    # date = input("Please input the start date (format: 2025-04-01): ")
+    date = "2025-12-03"
     util.check_folder("packing_slip")
     util.clear_folder("packing_slip")
     wb = Workbook()
     ws = wb.active
     ws.append(["PO","Vendor", "PackingSlip", "Shipping Date", "Receiving Date", "Days Difference", "Packing List"])
-    po = 24139
-    while po > 20000:
+    po = 24313
+    while po > 23000:
         try:
             masterData = get_master_key(po)
             po -= 1
@@ -102,14 +113,17 @@ def main():
                         continue
                     receivingDate = receivingDict[shipping["DetailPKey"]]
                     download_packing_list(shipping)
-                    fromAI = packing_slip.main(shipping["FileName"], receivingDate)
-                    if fromAI == "Not found" :
-                        print(f"{po+1} | {vendorName} | {packingDict[shipping["DetailPKey"]]} | | { receivingDate.strftime("%Y-%m-%d")} | ---------- | {shipping["FileName"]} ")
+                    fromAI = packing_slip.main(shipping["FileName"], receivingDate, vendorName)
+                    if fromAI == "Not found" and not "westburne" in vendorName.lower():
+                        print(f'{po+1} | {vendorName} | {packingDict[shipping["DetailPKey"]]} | | { receivingDate.strftime("%Y-%m-%d")} | ---------- | {shipping["FileName"]} ')
                         ws.append([po+1,vendorName, packingDict[shipping["DetailPKey"]], "" , receivingDate.strftime("%Y-%m-%d"), "" , shipping["FileName"]])
                         continue
-                    shippingDate = datetime.strptime(fromAI, "%Y-%m-%d")
+                    if fromAI == "Not found":
+                        shippingDate = receivingDate
+                    else:
+                        shippingDate = datetime.strptime(fromAI, "%Y-%m-%d")
                     diff = abs((shippingDate - receivingDate).days)
-                    print(f"{po+1} | {vendorName} | {packingDict[shipping["DetailPKey"]]} | {shippingDate.strftime("%Y-%m-%d")} | { receivingDate.strftime("%Y-%m-%d")} | {diff} | {shipping["FileName"]} ")
+                    print(f'{po+1} | {vendorName} | {packingDict[shipping["DetailPKey"]]} | {shippingDate.strftime("%Y-%m-%d")} | { receivingDate.strftime("%Y-%m-%d")} | {diff} | {shipping["FileName"]} ')
                     ws.append([po+1,vendorName, packingDict[shipping["DetailPKey"]], shippingDate.strftime("%Y-%m-%d"), receivingDate.strftime("%Y-%m-%d"), diff, shipping["FileName"]])
                     
                 except Exception as e:

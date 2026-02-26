@@ -13,6 +13,7 @@ import time
 import argparse
 from pathlib import Path
 from typing import Optional
+from PySide6.QtCore import QTimer
 
 from tools.runtime_logger import RuntimeLogger
 import tools.util as util
@@ -162,9 +163,6 @@ def launch_ui() -> int:
         
         # Create application (must be before any QWidget creation)
         app = QApplication(sys.argv)
-        #region agent log
-        _agent_log("H5", "main.launch_ui", "QApplication created", {"app": bool(app), "instance": bool(QApplication.instance())})
-        #endregion
         
         # Set application properties
         app.setApplicationName("QCA Accounting Automation Tool")
@@ -176,6 +174,11 @@ def launch_ui() -> int:
             app.setFont(base_font)
         except Exception:
             pass
+        
+        
+        #region agent log
+        _agent_log("H5", "main.launch_ui", "QApplication created", {"app": bool(app), "instance": bool(QApplication.instance())})
+        #endregion
         #region agent log
         _agent_log("H5", "main.launch_ui", "After set app properties", {})
         #endregion
@@ -194,20 +197,22 @@ def launch_ui() -> int:
 
         def _report_startup(percent: int, text: str) -> None:
             """Update startup progress UI (best-effort)."""
-            if not progress_dialog:
-                return
-            try:
-                progress_dialog.set_progress(percent, text)
-                app.processEvents()
-            except Exception:
-                pass
+            if progress_dialog:
+                try:
+                    progress_dialog.set_progress(percent, text)
+                    app.processEvents()
+                except Exception:
+                    pass
         
         # Import MainWindow after QApplication is created
         #region agent log
         _agent_log("H3", "main.launch_ui", "Before importing MainWindow", {"has_app": bool(QApplication.instance())})
         #endregion
         _report_startup(15, "Loading UI modules...")
+        app.processEvents()
+        
         from ui.main_window import MainWindow
+        app.processEvents()
         #region agent log
         _agent_log(
             "H2",
@@ -247,12 +252,30 @@ def launch_ui() -> int:
         _agent_log("H4", "main.launch_ui", "Before creating MainWindow instance", {"has_app": bool(QApplication.instance())})
         #endregion
         _report_startup(35, "Building main window...")
+        app.processEvents()
+        
+        # Create main window (this may take time)
         window = MainWindow(startup_progress=_report_startup)
+        app.processEvents()
+        
         #region agent log
         _agent_log("H4", "main.launch_ui", "MainWindow created", {"has_app": bool(QApplication.instance())})
         #endregion
         _report_startup(90, "Finalizing...")
+        app.processEvents()
+        
+        # Show main window
         window.show()
+        app.processEvents()
+
+        # Only close PyInstaller splash in frozen executable
+        if getattr(sys, "frozen", False):
+            try:
+                import pyi_splash
+                pyi_splash.close()
+            except Exception:
+                pass
+
         #region agent log
         _agent_log("H5", "main.launch_ui", "Window shown", {})
         #endregion
@@ -277,7 +300,7 @@ def launch_ui() -> int:
                 progress_dialog.close()
         except Exception:
             pass
-
+        
         # Print error to console for debugging
         import traceback
         error_msg = f"Application error: {str(exc)}\n{traceback.format_exc()}"
@@ -295,7 +318,6 @@ def launch_ui() -> int:
         except Exception:
             pass
         raise
-
 
 def main() -> int:
     """
@@ -341,6 +363,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    #login.sso_login()
+    # import core.project_status as project_status
+    # project_status.main()
+    import core.revenue_accrual as revenue_accrual
+    revenue_accrual.main()
+    '''
     util.init_workdir()
 
     exit_code = main()
@@ -351,3 +379,4 @@ if __name__ == "__main__":
         # Only print completion message for CLI mode
         pass
     sys.exit(exit_code)
+    '''

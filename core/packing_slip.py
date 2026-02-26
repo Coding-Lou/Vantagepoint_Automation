@@ -2,7 +2,7 @@ from openai import OpenAI
 import pandas as pd
 import os
 
-def main(fileName, receiveDate):
+def main(fileName, receiveDate, vendorName):
     try:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -14,11 +14,11 @@ def main(fileName, receiveDate):
             purpose="user_data"
         )
 
-        prompt_text = """
-You are an expert OCR and document-understanding system. You will be given a PDF containing shipment information. Find the date directly below to the label "Ship Date" (case-insensitive). The date follows the format YY MMM DD (e.g., 25 JAN 12). Convert it to YYYY-MM-DD: interpret YY as 20YY, map month abbreviation to two digits, keep the day. Output only the converted date in YYYY-MM-DD. If missing or unreadable, output null. Examples: 25 JAN 12 to 2025-01-12, 24 DEC 03 to 2024-12-03. Final output must be only one date value in YYYY-MM-DD format.
+        prompt_text = f"""
+Extract the shipment date from a PDF and output ONLY a single value (YYYY-MM-DD or "Not found") with no explanation or extra text. The PDF contains shipment information and a Receive Date: {receiveDate}. Vendor: {vendorName}. Use OCR and document-understanding to locate the Ship Date, attempting recognition even if text is blurred, noisy, scanned at low quality, tilted, rotated, partially occluded, or on multiple pages; allow minor OCR errors (e.g., "JAN" misread as "JAH" or "J4N", digits misrecognized, slashes/hyphens swapped, extra spaces) and automatically correct them only if the intended date is unambiguous; do NOT invent, estimate, or interpolate missing parts. If Westburne, the Ship Date is guaranteed to exist; find "Ship Date" (case-insensitive) and extract the date directly below it, correcting minor OCR errors if necessary, in format YY MMM DD (e.g., "25 JAN 12" or "2025/01/12"); search all pages if needed. If WESCO, packing slip is landscape; after rotation, find date at top-left corner in format MM-DD-YY or YY MMM DD. If year is missing, assume 2025. Convert found date to YYYY-MM-DD: YY MMM DD → 20YY-MM-DD, MM-DD-YY → 20YY-MM-DD. Ensure date ≤ Receive Date and ≥ 2025-04-01; if not, output "Not found". Output strictly one value only: YYYY-MM-DD or "Not found". Examples: '25 JAN 12' → 2025-01-12, '03-24-25' → 2025-03-24, missing/unreadable date → Not found. Do not include spaces, notes, or reasoning.
     """
         response = client.responses.create(
-            model="gpt-4.1",
+            model="gpt-5.2",
             input=[
                 {
                     "role": "user",
@@ -65,17 +65,6 @@ if __name__ == "__main__":
 
 '''
         prompt_text = f"""
-        You are a precise OCR and date extraction system. Auto-rotate the PDF to upright orientation; extract all visible text exactly as it appears.
-Identify exactly three dates: Invoice Date or Order Date, Due Date, and Shipping Date or Delivery Date. Dates may appear in any common format (DD/MM, MM/DD, DD/MM/YYYY, MM/DD/YYYY, YY/MM/DD, DD.MM.YYYY, MM-DD-YY, DD-MM-YYYY). 
-The receive date is {receiveDate} in YYYY-MM-DD format.
-Rules:
-1. Only use dates explicitly present in the document; do NOT invent, estimate, or calculate any dates.
-2. If a date does not include a year, assume the year is 2025.
-3. Treat all dates on the same page as using the same format.
-4. Shipping Date must be no later than the Receive Date. Use this constraint to disambiguate dates with ambiguous day/month order. For example, if Receive Date is 2025-06-12 and the PDF shows 06/12, interpret it as 2025-06-12 (not 2025-12-06).
-5. Convert all dates strictly to YYYY-MM-DD.
-6. Output exactly the ShippingDate, with no spaces, explanations, or reasoning.
-7. If any date cannot be determined unambiguously, output exactly "Not found".
-The output MUST be STRICTLY to ONE DATE VALUE in YYYY-MM-DD or "Not found"
+        Extract the shipment date from a PDF following the precise instructions below, and output ONLY a single value (YYYY-MM-DD or "Not found") with no explanation, formatting, or extra text. ## Task Objective and Steps 1. **Input:** You will receive a PDF document containing shipment information and a "Receive Date" in YYYY-MM-DD format (e.g., 2025-06-12). 2. **Company Identification:** - If "Westburne": Find "Ship Date" (case-insensitive). The ship date is directly below this label, format is `YY MMM DD` (e.g., "25 JAN 12" or "2025/01/12"). - If "WESCO": Packing slip is landscape and must be rotated upright. Find the date at the top-left corner, format is `MM-DD-YY` or `YY MMM DD`. - Dates on the same page are in the same format. 3. **Date Extraction:** - Locate the date directly below "Ship Date" (case-insensitive) for Westburne, or the top-left for WESCO. - Only use explicitly present, human-readable dates; **never invent, estimate, or interpolate dates**. - If a date does not include a year, assume year equals 2025. 4. **Date Conversion:** - Convert the found date to YYYY-MM-DD: - For `YY MMM DD`: YY → 20YY, map MMM to MM, keep DD. Example: "25 JAN 12" → "2025-01-12". - For `MM-DD-YY`: MM → month, DD → day, YY → year (20YY). - For ambiguous forms (e.g., 06-12), use Receive Date: ensure the shipping date is not after the Receive Date. - All date output **must be after 2025-04-01**. If not, double-check format; if still not compliant, proceed as below. 5. **Ambiguity and Failsafes:** - If no explicit ship date is found, or ambiguity remains, output **only**: `Not found`. - Only output the date if unambiguous and correctly formatted. Otherwise, output `Not found`. 6. **Output:** - Output strictly one value: the converted shipping date in YYYY-MM-DD format, or exactly `Not found`. - **Do not include any spaces, notes, or explanations.** ## Output Format - Output must be **a single string value only**: either the shipping date in YYYY-MM-DD format or `Not found`. - No extra text, explanations, spaces, or reasoning. ## Reasoning and Conclusion Order **ORDER:** 1. Extract and analyze (reasoning) the required date from the document, validating constraints. 2. Output only the single shipping date value or "Not found" (conclusion). ## Example Inputs and Outputs **Example 1** PDF: Westburne packing slip, "Ship Date" field reads '25 JAN 12'. Receive Date: 2025-06-12 Output: 2025-01-12 **Example 2** PDF: WESCO packing slip, landscape, top-left reads '03-24-25'. Receive Date: 2025-06-12 Output: 2025-03-24 (If the result was before 2025-04-01, check again; if still earlier, and you can't find another result, output "Not found") **Example 3** PDF: Unable to find any ship date. Output: Not found **Example 4** PDF: Westburne, Ship Date is 'DEC 05' Receive Date: 2025-06-12 Output: 2025-12-05 (Note: Year assumed to be 2025 as per instruction.) **Example 5** PDF: '12/06' present, Receive Date: 2025-06-12 Output: 2025-06-12 (Disambiguate order so shipping date is not later than receive date.) ## Edge Cases and Considerations - Never guess or invent a date value. - Yearless dates default to 2025. - If a shipping date is not found or not after 2025-04-01, output "Not found". - Never output explanation, multiple values, or any other text. **REMINDER:** Output only one date value in YYYY-MM-DD format or "Not found". Never invent, guess, or explain. Follow all constraints, including after 2025-04-01 rule and single-value output.
         """
 '''

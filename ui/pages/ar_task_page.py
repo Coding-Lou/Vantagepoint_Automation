@@ -6,9 +6,6 @@ Task: Generate AR statements with email configuration.
 from typing import Dict, Any, Tuple, Optional
 
 from PySide6.QtWidgets import (
-    QDateEdit,
-    QLineEdit,
-    QTextEdit,
     QLabel,
     QFormLayout,
     QHBoxLayout,
@@ -19,6 +16,7 @@ from qfluentwidgets import (
     DatePicker,
     LineEdit,
     BodyLabel,
+    TextEdit,
     PrimaryPushButton,
     PushButton,
     FluentIcon,
@@ -141,9 +139,9 @@ class ARTaskPage(BaseTaskPage):
         self.config_layout.addLayout(email_form)
         self.config_layout.addWidget(body_label)
         
-        self.mail_body_edit = QTextEdit()
+        self.mail_body_edit = TextEdit()
         self.mail_body_edit.setAcceptRichText(True)
-        self.mail_body_edit.setMaximumHeight(100)
+        self.mail_body_edit.setMaximumHeight(500)
         self.mail_body_edit.setPlaceholderText("Enter email body HTML content...")
         self.mail_body_edit.setReadOnly(True)
         self.mail_body_edit.setStyleSheet(
@@ -197,6 +195,11 @@ class ARTaskPage(BaseTaskPage):
             self.mail_subject_edit.setReadOnly(False)
             self.mail_body_edit.setReadOnly(False)
             
+            # Switch to plain text mode to show HTML tags
+            # Get the original HTML source from config to display as plain text
+            html_source = util_module.get_config(["AR", "BODY"]) or ""
+            self.mail_body_edit.setPlainText(html_source)
+            
             # Update button states
             self.email_edit_btn.setEnabled(False)
             self.email_save_btn.setEnabled(True)
@@ -210,7 +213,10 @@ class ARTaskPage(BaseTaskPage):
             mail_from = self.mail_from_edit.text()
             mail_cc = self.mail_cc_edit.text()
             mail_subject = self.mail_subject_edit.text()
-            mail_body = self.mail_body_edit.toHtml()
+            
+            # In edit mode, get the plain text (HTML source) that user edited
+            html_source = self.mail_body_edit.toPlainText()
+            mail_body = html_source
             
             # Save to config using config_manager
             updates = {
@@ -228,6 +234,10 @@ class ARTaskPage(BaseTaskPage):
                 self.mail_cc_edit.setReadOnly(True)
                 self.mail_subject_edit.setReadOnly(True)
                 self.mail_body_edit.setReadOnly(True)
+                
+                # Switch back to HTML rendering mode (hide HTML tags)
+                # Set the HTML content to display rendered version
+                self.mail_body_edit.setHtml(mail_body)
                 
                 # Update button states
                 self.email_edit_btn.setEnabled(True)

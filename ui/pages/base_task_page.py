@@ -17,9 +17,6 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
-    QTextEdit,
-    QScrollArea,
 )
 from PySide6.QtCore import Signal, Slot, Qt, QEvent
 from PySide6.QtGui import QPalette, QColor
@@ -29,6 +26,8 @@ from qfluentwidgets import (
     CardWidget,
     TitleLabel,
     BodyLabel,
+    ScrollArea,
+    TextEdit,
     PlainTextEdit,
     PushButton,
 )
@@ -130,7 +129,7 @@ class BaseTaskPage(QWidget):
         self._apply_page_background()
 
         # === Scrollable content (so Execute button is always visible) ===
-        self._scroll = QScrollArea(self)
+        self._scroll = ScrollArea(self)
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._apply_scroll_area_style()
@@ -167,7 +166,7 @@ class BaseTaskPage(QWidget):
         log_card_layout.addWidget(log_title)
 
         # Log viewer - Use QTextEdit for HTML support
-        self.log_viewer = QTextEdit()
+        self.log_viewer = TextEdit()
         self.log_viewer.setReadOnly(True)
         # Set minimum height for better log visibility
         self.log_viewer.setMinimumHeight(500)

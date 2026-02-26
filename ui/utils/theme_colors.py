@@ -76,7 +76,7 @@ class ThemeColors:
     @staticmethod
     def border_primary() -> str:
         """Primary border color."""
-        return "#d0d0d0" if not isDarkTheme() else "#3c3c3c"
+        return "#e0e0e0" if not isDarkTheme() else "#3c3c3c"
     
     @staticmethod
     def border_secondary() -> str:

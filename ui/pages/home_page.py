@@ -4,7 +4,7 @@ Home page (Dashboard) for the application.
 Displays overview, login status, recent tasks, and quick access buttons.
 """
 from typing import Optional, Any
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PySide6.QtCore import Qt, QTimer
 
 from qfluentwidgets import (
@@ -15,8 +15,7 @@ from qfluentwidgets import (
     BodyLabel,
     TitleLabel,
     CaptionLabel,
-    HyperlinkButton,
-    IndeterminateProgressRing,
+    MessageBox,
     setTheme,
     Theme,
     isDarkTheme,
@@ -321,25 +320,27 @@ class HomePage(QWidget):
             local_version = result.get("local_version", "Unknown")
             release_info = result.get("release_info", {})
             
-            # Show notification dialog to user
-            reply = QMessageBox.question(
-                self,
-                "Update Available",
-                f"A new version is available!\n\n"
+            # Show notification dialog to user using qfluentwidgets MessageBox
+            msg_box = MessageBox(
+                title="Update Available",
+                content=f"A new version is available!\n\n"
                 f"Current version: {local_version}\n"
                 f"Latest version: {latest_version}\n\n"
                 f"Would you like to update now?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes
+                parent=self
             )
             
-            if reply == QMessageBox.StandardButton.Yes:
+            # Connect yesSignal to handle user confirmation
+            def _handle_update_yes():
                 # User chose to update - open update dialog and start download immediately
                 from ui.widgets.update_dialog import UpdateDialog
                 dialog = UpdateDialog(self)
                 # Pre-populate with update info and start download automatically
                 dialog._start_update_immediately(release_info, latest_version, local_version)
                 dialog.exec()
+            
+            msg_box.yesSignal.connect(_handle_update_yes)
+            msg_box.exec()
     
     def _on_check_update_clicked(self) -> None:
         """Handle check for updates button click - show update dialog."""

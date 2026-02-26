@@ -368,12 +368,24 @@ class MainWindow(FluentWindow):
                 # Silently ignore errors in progress reporting to avoid breaking startup
                 pass
 
+    def center_window(self):
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        screen_center_x = screen_geometry.width() // 2
+        screen_center_y = screen_geometry.height() // 2
+
+        window_geometry = self.frameGeometry()
+        window_geometry.moveCenter(screen_geometry.center())
+
+        self.move(window_geometry.topLeft())
+
     def _init_window(self):
         """Initialize basic window properties and custom TitleBar."""
         self.setTitleBar(CustomTitleBar(self))
         self.setWindowTitle("QCA Accounting Automation Tool")
         self.resize(1200, 800)
         self.setMinimumSize(900, 650)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        self.center_window()
         
         # Set Fluent theme
         try:

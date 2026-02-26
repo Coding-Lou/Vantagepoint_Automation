@@ -6,13 +6,13 @@ Task: Check statement status for invoices.
 from typing import Dict, Any, Tuple
 
 from PySide6.QtWidgets import (
-    QComboBox,
     QFormLayout,
     QHBoxLayout,
 )
 from PySide6.QtCore import Qt
 
 from qfluentwidgets import (
+    ComboBox,
     LineEdit,
     BodyLabel,
     PrimaryPushButton,
@@ -67,24 +67,24 @@ class StatementCheckTaskPage(BaseTaskPage):
         client_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(client_label)
         
-        self.client_combo = QComboBox()
+        self.client_combo = ComboBox()
         bg = ThemeColors.background_input()
         text = ThemeColors.text_primary()
         border = ThemeColors.border_primary()
         arrow_color = ThemeColors.text_secondary()
         self.client_combo.setStyleSheet(f"""
-            QComboBox {{
+            ComboBox {{
                 padding: 6px;
                 border: 1px solid {border};
                 border-radius: 4px;
                 background-color: {bg};
                 color: {text};
             }}
-            QComboBox::drop-down {{
+            ComboBox::drop-down {{
                 border: none;
                 padding-right: 8px;
             }}
-            QComboBox::down-arrow {{
+            ComboBox::down-arrow {{
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;

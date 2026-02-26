@@ -49,7 +49,8 @@ class ProjectStatusAdapter(BaseAdapter):
         self,
         period: str,
         use_filter: bool,
-        project_names: str
+        project_names: str,
+        start_year: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Execute project status report generation task.
@@ -58,6 +59,8 @@ class ProjectStatusAdapter(BaseAdapter):
             period: Accounting period in YYYYMM format (e.g., 202607)
             use_filter: If True, filter by charge type (Regular) and created date; if False, use manual project names
             project_names: Comma-separated project names string (only used when use_filter is False)
+            start_year: Year to use for start date filter (only used when use_filter is True). 
+                       If None, defaults to current year - 3.
             
         Returns:
             Result dictionary with success status and output file path
@@ -96,8 +99,10 @@ class ProjectStatusAdapter(BaseAdapter):
                 if use_filter:
                     # Filter by charge type (Regular) and created date
                     from datetime import date
-                    current_year = date.today().year
-                    start_date = f"{current_year - 3}-01-01T00:00:00"
+                    # Use provided start_year or default to current year - 3
+                    if start_year is None:
+                        start_year = date.today().year - 3
+                    start_date = f"{start_year}-01-01T00:00:00"
                     ps_module.searchOptions = [
                         {
                             "name": "CreateDate",

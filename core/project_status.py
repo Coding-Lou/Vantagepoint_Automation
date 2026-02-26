@@ -13,7 +13,8 @@ HEADERS = util.set_headers()
 global searchOptions
 searchOptions = None
 global output_file
-output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
+# output_file = os.path.join("project status", "output_" + date.today().strftime("%Y-%m-%d") + ".xlsx")
+output_file = os.path.join("project status", "output.xlsx")
 
 def init_output():
     if Path(output_file).exists():

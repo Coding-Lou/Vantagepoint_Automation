@@ -9,6 +9,8 @@ import pandas as pd
 import subprocess
 import glob
 import sys
+import win32com.client as win32
+from win32com.client import constants
 
 def show_welcome_banner():
     banner = rf"""
@@ -527,3 +529,59 @@ def cleanup_projectName(projName: str) -> str:
     for k, v in replace_map.items():
         projName = projName.replace(k, v)
     return projName
+
+def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue, targetCell='A1'):
+    if not os.path.exists(inputFile):
+        raise FileNotFoundError(f"Input file not found: {inputFile}")
+    if not os.path.exists(targetFile):
+        raise FileNotFoundError(f"Target file not found: {targetFile}")
+    
+    inputFile = os.path.abspath(inputFile)
+    targetFile = os.path.abspath(targetFile)
+
+    excel = win32.DispatchEx("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    wb_input = None
+    wb_target = None
+
+    try:
+        wb_input = excel.Workbooks.Open(inputFile)
+        ws_input = wb_input.Worksheets(1) if inputFile.lower().endswith(".csv") else wb_input.Worksheets(inputSheet)
+        
+        source_range = ws_input.UsedRange
+        if source_range is None:
+            print(f"No data found in {inputFile}")
+            return
+
+        wb_target = excel.Workbooks.Open(targetFile)
+        try:
+            ws_target = wb_target.Worksheets(targetSheet)
+        except:
+            ws_target = wb_target.Worksheets.Add()
+            ws_target.Name = targetSheet
+
+
+        anchor_range = ws_target.Range(targetCell)
+        target_col = anchor_range.Column
+        base_row = anchor_range.Row
+        last_row = ws_target.Cells(ws_target.Rows.Count, target_col).End(-4162).Row
+    
+        final_dest = ws_target.Cells(base_row, target_col)
+
+        source_range.Copy()
+ 
+        if onlyValue:
+            final_dest.PasteSpecial(Paste=-4163)
+        else:
+            final_dest.PasteSpecial(Paste=-4104)
+
+        excel.CutCopyMode = False
+        #ws_target.Rows(f"{last_row + 1}:{ws_target.Rows.Count}").Delete()
+        wb_target.Save()
+        print(f"Data copied to {targetFile} in sheet {targetSheet} starting at {final_dest.Address}")
+        wb_target.RefreshAll()
+    finally:
+        if wb_input: wb_input.Close(False)
+        if wb_target: wb_target.Close(True)
+        excel.Quit()

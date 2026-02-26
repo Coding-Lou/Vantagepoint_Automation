@@ -8,19 +8,16 @@ from typing import Dict, Any, Tuple
 from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
-    QComboBox,
-    QRadioButton,
-    QButtonGroup,
+    QButtonGroup,    
 )
 from PySide6.QtCore import Qt
 from datetime import date
 
 from qfluentwidgets import (
+    ComboBox,
+    RadioButton,
     LineEdit,
     BodyLabel,
-    PrimaryPushButton,
-    PushButton,
-    FluentIcon,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
@@ -44,7 +41,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
         
         super().__init__(
             "project_status",
-            "Project Status",
+            "project_status",
             parent
         )
         
@@ -80,24 +77,24 @@ class ProjectStatusTaskPage(BaseTaskPage):
         period_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(period_label)
         
-        self.period_combo = QComboBox()
+        self.period_combo = ComboBox()
         bg = ThemeColors.background_input()
         text = ThemeColors.text_primary()
         border = ThemeColors.border_primary()
         arrow_color = ThemeColors.text_secondary()
         self.period_combo.setStyleSheet(f"""
-            QComboBox {{
+            ComboBox {{
                 padding: 6px;
                 border: 1px solid {border};
                 border-radius: 4px;
                 background-color: {bg};
                 color: {text};
             }}
-            QComboBox::drop-down {{
+            ComboBox::drop-down {{
                 border: none;
                 padding-right: 8px;
             }}
-            QComboBox::down-arrow {{
+            ComboBox::down-arrow {{
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
@@ -121,21 +118,62 @@ class ProjectStatusTaskPage(BaseTaskPage):
         # Create button group for radio buttons
         self.filter_mode_group = QButtonGroup(self)
         
-        # Calculate the date for filter option
+        # Year selection dropdown (only visible when filter mode is selected)
+        self.year_label = BodyLabel("Project Created After Year")
+        self.year_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self.config_layout.addWidget(self.year_label)
+        
+        self.year_combo = ComboBox()
         current_year = date.today().year
-        filter_date = f"{current_year - 3}-01-01"
+        # Add last 5 years to dropdown
+        for i in range(5):
+            year = current_year - i
+            self.year_combo.addItem(f"{str(year)}-01-01T00:00:00", userData=year)
+        
+        # Set default to 3 years ago (current behavior)
+        default_year = current_year - 3
+        for i in range(self.year_combo.count()):
+            if self.year_combo.itemData(i) == default_year:
+                self.year_combo.setCurrentIndex(i)
+                break
+        
+        bg = ThemeColors.background_input()
+        text = ThemeColors.text_primary()
+        border = ThemeColors.border_primary()
+        arrow_color = ThemeColors.text_secondary()
+        self.year_combo.setStyleSheet(f"""
+            ComboBox {{
+                padding: 6px;
+                border: 1px solid {border};
+                border-radius: 4px;
+                background-color: {bg};
+                color: {text};
+            }}
+            ComboBox::drop-down {{
+                border: none;
+                padding-right: 8px;
+            }}
+            ComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 4px solid {arrow_color};
+                margin-right: 4px;
+            }}
+        """)
+        self.config_layout.addWidget(self.year_combo)
         
         # Option 1: Filter by charge type and created date
-        self.filter_radio = QRadioButton(
-            f"Filter by charge type (Regular) and created date (after {filter_date})"
+        self.filter_radio = RadioButton(
+            "Filter by charge type (Regular) and created date (after selected year)"
         )
         self.filter_radio.setChecked(False)
         self.filter_radio.setStyleSheet("""
-            QRadioButton {
+            RadioButton {
                 padding: 4px;
                 font-size: 12px;
             }
-            QRadioButton::indicator {
+            RadioButton::indicator {
                 width: 16px;
                 height: 16px;
             }
@@ -144,14 +182,14 @@ class ProjectStatusTaskPage(BaseTaskPage):
         self.config_layout.addWidget(self.filter_radio)
         
         # Option 2: Manual project input
-        self.manual_radio = QRadioButton("Manually enter project names")
+        self.manual_radio = RadioButton("Manually enter project names")
         self.manual_radio.setChecked(True)  # Default to manual input
         self.manual_radio.setStyleSheet("""
-            QRadioButton {
+            RadioButton {
                 padding: 4px;
                 font-size: 12px;
             }
-            QRadioButton::indicator {
+            RadioButton::indicator {
                 width: 16px;
                 height: 16px;
             }
@@ -182,7 +220,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
         )
         self.config_layout.addWidget(self.projects_edit)
         
-        # Set initial visibility state (manual mode is default, so project input is visible)
+        # Set initial visibility state (manual mode is default, so project input is visible, year selector is hidden)
         self._on_filter_mode_changed()
     
     def _load_config(self) -> None:
@@ -191,11 +229,16 @@ class ProjectStatusTaskPage(BaseTaskPage):
         pass
     
     def _on_filter_mode_changed(self) -> None:
-        """Handle filter mode radio button change - show/hide project input."""
+        """Handle filter mode radio button change - show/hide project input and year selector."""
         # Show project input only when manual mode is selected
         is_manual_mode = self.manual_radio.isChecked()
+        is_filter_mode = self.filter_radio.isChecked()
         self.projects_label.setVisible(is_manual_mode)
         self.projects_edit.setVisible(is_manual_mode)
+        # Show year selector only when filter mode is selected
+        if hasattr(self, 'year_combo') and hasattr(self, 'year_label'):
+            self.year_label.setVisible(is_filter_mode)
+            self.year_combo.setVisible(is_filter_mode)
     
     def _on_login_state_changed(self, is_logged_in: bool) -> None:
         """Handle login state change - reload periods when user logs in."""
@@ -287,10 +330,22 @@ class ProjectStatusTaskPage(BaseTaskPage):
         use_filter = self.filter_radio.isChecked()
         projects_text = self.projects_edit.text().strip() if self.manual_radio.isChecked() else ""
         
+        # Get selected year from dropdown (only used when filter mode is enabled)
+        selected_year = None
+        if use_filter and hasattr(self, 'year_combo'):
+            selected_year = self.year_combo.currentData()
+            if selected_year is None:
+                # Fallback to current text if data is not available
+                try:
+                    selected_year = int(self.year_combo.currentText())
+                except ValueError:
+                    selected_year = date.today().year - 3  # Default fallback
+        
         return {
             "period": period,
             "use_filter": use_filter,  # True if filtering by charge type and created date
             "project_names": projects_text,  # Comma-separated string (empty if use_filter is True)
+            "start_year": selected_year,  # Selected year for filter (only used when use_filter is True)
         }
     
     def _create_worker(self, params: Dict[str, Any]) -> ProjectStatusWorker:
