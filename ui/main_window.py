@@ -44,7 +44,11 @@ except Exception as e:
 #endregion
 
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QFrame
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QLabel,
+    QFrame,
 )
 #region agent log
 try:
@@ -72,7 +76,8 @@ from qfluentwidgets import (
     Theme,
     NavigationItemPosition,
     NavigationWidget,
-    isDarkTheme
+    isDarkTheme,
+    MessageBox,
 )
 
 from qfluentwidgets import FluentIcon as FIF
@@ -113,6 +118,7 @@ from ui.pages.home_page import HomePage
 from ui.pages.ap_task_page import APTaskPage
 from ui.pages.ar_task_page import ARTaskPage
 from ui.pages.project_status_task_page import ProjectStatusTaskPage
+from ui.pages.revenue_accrual_task_page import RevenueAccrualTaskPage
 from ui.pages.statement_check_task_page import StatementCheckTaskPage
 from ui.pages.base_task_page import BaseTaskPage
 from ui.pages.scheduled_tasks_page import ScheduledTasksPage
@@ -384,7 +390,6 @@ class MainWindow(FluentWindow):
         self.setWindowTitle("QCA Accounting Automation Tool")
         self.resize(1200, 800)
         self.setMinimumSize(900, 650)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         self.center_window()
         
         # Set Fluent theme
@@ -544,6 +549,7 @@ class MainWindow(FluentWindow):
         
         # Set up navigation callback - switch to AP page using objectName
         # Optimized: use cached page reference instead of searching
+        # NOTE: These callbacks are part of UI navigation behavior, not business logic.
         def navigate_to_ap():
             if "ap" in self.task_pages:
                 self._switch_to_page("ap")
@@ -559,14 +565,24 @@ class MainWindow(FluentWindow):
         
         # Add home page to navigation (first item)
         try:
+            # Load theme-aware monochrome icon for Home, fallback to FluentIcon.HOME
             def load_icon(icon_name: str):
                 icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-                svg_path = icons_dir / f"{icon_name}.svg"
+                # Use *_light for dark theme (light icon on dark bg), *_dark for light theme
+                suffix = "_light" if isDarkTheme() else "_dark"
+                svg_path = icons_dir / f"{icon_name}{suffix}.svg"
                 if svg_path.exists():
                     return QIcon(str(svg_path))
-                png_path = icons_dir / f"{icon_name}.png"
+                png_path = icons_dir / f"{icon_name}{suffix}.png"
                 if png_path.exists():
                     return QIcon(str(png_path))
+                # Fallback to base name without suffix
+                base_svg = icons_dir / f"{icon_name}.svg"
+                if base_svg.exists():
+                    return QIcon(str(base_svg))
+                base_png = icons_dir / f"{icon_name}.png"
+                if base_png.exists():
+                    return QIcon(str(base_png))
                 return FluentIcon.HOME
             
             home_icon = load_icon("home")
@@ -586,6 +602,7 @@ class MainWindow(FluentWindow):
         self.task_pages["ap"] = APTaskPage()
         self.task_pages["ar"] = ARTaskPage()
         self.task_pages["project_status"] = ProjectStatusTaskPage()
+        self.task_pages["revenue_accrual"] = RevenueAccrualTaskPage()
         self.task_pages["statement_check"] = StatementCheckTaskPage()
 
         # Add task pages to navigation and stacked widget
@@ -593,20 +610,29 @@ class MainWindow(FluentWindow):
             page.setObjectName(task_id)
             # Keep default paint behavior to avoid visual artifacts
             try:
+                # Load theme-aware monochrome icons for task pages, with FluentIcon fallback
                 def load_icon(icon_name: str):
                     icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-                    svg_path = icons_dir / f"{icon_name}.svg"
+                    suffix = "_light" if isDarkTheme() else "_dark"
+                    svg_path = icons_dir / f"{icon_name}{suffix}.svg"
                     if svg_path.exists():
                         return QIcon(str(svg_path))
-                    png_path = icons_dir / f"{icon_name}.png"
+                    png_path = icons_dir / f"{icon_name}{suffix}.png"
                     if png_path.exists():
                         return QIcon(str(png_path))
+                    base_svg = icons_dir / f"{icon_name}.svg"
+                    if base_svg.exists():
+                        return QIcon(str(base_svg))
+                    base_png = icons_dir / f"{icon_name}.png"
+                    if base_png.exists():
+                        return QIcon(str(base_png))
                     return FluentIcon.DOCUMENT
                 
                 icon_map = {
                     "ap": load_icon("ap"),
                     "ar": load_icon("ar"),
                     "project_status": load_icon("project_status"),
+                    "revenue_accrual": load_icon("revenue_accrual"),
                     "statement_check": load_icon("statement_check"),
                 }
                 icon = icon_map.get(task_id, FluentIcon.DOCUMENT)
@@ -630,17 +656,26 @@ class MainWindow(FluentWindow):
         scheduled_tasks_page = ScheduledTasksPage()
         scheduled_tasks_page.setObjectName("scheduled_tasks")
         try:
-            icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-            schedule_icon_path = icons_dir / "schedule.svg"
-            if schedule_icon_path.exists():
-                schedule_icon = QIcon(str(schedule_icon_path))
-            else:
-                schedule_png_path = icons_dir / "schedule.png"
-                if schedule_png_path.exists():
-                    schedule_icon = QIcon(str(schedule_png_path))
-                else:
-                    schedule_icon = FluentIcon.CALENDAR
+            # Load theme-aware monochrome icon for Scheduled Tasks, fallback to FluentIcon.CALENDAR
+            def load_icon(icon_name: str):
+                icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
+                suffix = "_light" if isDarkTheme() else "_dark"
+                svg_path = icons_dir / f"{icon_name}{suffix}.svg"
+                if svg_path.exists():
+                    return QIcon(str(svg_path))
+                png_path = icons_dir / f"{icon_name}{suffix}.png"
+                if png_path.exists():
+                    return QIcon(str(png_path))
+                base_svg = icons_dir / f"{icon_name}.svg"
+                if base_svg.exists():
+                    return QIcon(str(base_svg))
+                base_png = icons_dir / f"{icon_name}.png"
+                if base_png.exists():
+                    return QIcon(str(base_png))
+                return FluentIcon.CALENDAR
             
+            schedule_icon = load_icon("schedule")
+
             self.addSubInterface(
                 interface=scheduled_tasks_page,
                 icon=schedule_icon,
@@ -680,6 +715,21 @@ class MainWindow(FluentWindow):
             page._set_execution_enabled(True)
         self.current_worker = None
         self.setWindowTitle("QCA Accounting Automation Tool")
+        
+        # Show completion dialog when task finished successfully
+        try:
+            success = bool(result.get("success"))
+            message = result.get("message", "Task completed.")
+            if success:
+                dialog = MessageBox(
+                    title="Task Completed",
+                    content=message,
+                    parent=self,
+                )
+                dialog.exec()
+        except Exception:
+            # Silently ignore errors from completion dialog
+            pass
     
     @Slot(str, str)
     def _on_task_failed(self, task_id: str, error: str) -> None:
@@ -928,6 +978,63 @@ class MainWindow(FluentWindow):
                                 page.showEvent(QShowEvent())
                         except Exception:
                             pass
+
+                # Also update navigation icons to match new theme
+                try:
+                    nav = getattr(self, 'navigationInterface', None)
+                    if nav and hasattr(nav, 'panel') and hasattr(nav.panel, 'widget'):
+                        from qfluentwidgets.components.navigation import NavigationPushButton
+
+                        def _load_nav_icon(icon_name: str, default_icon: FluentIcon) -> QIcon:
+                            icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
+                            suffix = "_light" if isDarkTheme() else "_dark"
+                            svg_path = icons_dir / f"{icon_name}{suffix}.svg"
+                            if svg_path.exists():
+                                return QIcon(str(svg_path))
+                            png_path = icons_dir / f"{icon_name}{suffix}.png"
+                            if png_path.exists():
+                                return QIcon(str(png_path))
+                            base_svg = icons_dir / f"{icon_name}.svg"
+                            if base_svg.exists():
+                                return QIcon(str(base_svg))
+                            base_png = icons_dir / f"{icon_name}.png"
+                            if base_png.exists():
+                                return QIcon(str(base_png))
+                            return default_icon
+
+                        # Home icon
+                        try:
+                            w = nav.panel.widget('home')
+                            if isinstance(w, NavigationPushButton):
+                                w.setIcon(_load_nav_icon('home', FluentIcon.HOME))
+                        except Exception:
+                            pass
+
+                        # Task icons
+                        for route_key, icon_name, default_icon in [
+                            ('ap', 'ap', FluentIcon.DOCUMENT),
+                            ('ar', 'ar', FluentIcon.DOCUMENT),
+                            ('project_status', 'project_status', FluentIcon.DOCUMENT),
+                            ('revenue_accrual', 'revenue_accrual', FluentIcon.DOCUMENT),
+                            ('statement_check', 'statement_check', FluentIcon.DOCUMENT),
+                        ]:
+                            try:
+                                w = nav.panel.widget(route_key)
+                                if isinstance(w, NavigationPushButton):
+                                    w.setIcon(_load_nav_icon(icon_name, default_icon))
+                            except Exception:
+                                pass
+
+                        # Scheduled tasks icon
+                        try:
+                            w = nav.panel.widget('scheduled_tasks')
+                            if isinstance(w, NavigationPushButton):
+                                w.setIcon(_load_nav_icon('schedule', FluentIcon.CALENDAR))
+                        except Exception:
+                            pass
+                except Exception:
+                    # Silently ignore navigation icon update errors
+                    pass
         except Exception:
             # Silently ignore all errors
             pass

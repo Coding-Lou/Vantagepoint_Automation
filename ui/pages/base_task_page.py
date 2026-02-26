@@ -34,6 +34,7 @@ from qfluentwidgets import (
 
 from workers.base_worker import BaseWorker
 from ui.utils.theme_colors import ThemeColors
+import tools.util as util_module
 
 #region agent log
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -286,6 +287,26 @@ class BaseTaskPage(QWidget):
     @Slot()
     def _on_execute_clicked(self) -> None:
         """Handle execute button click."""
+        # Check login status before running any task
+        try:
+            is_logged_in = bool(util_module.check_login())
+        except Exception:
+            is_logged_in = False
+
+        if not is_logged_in:
+            self._append_log("WARNING", "Login required. Opening sign-in dialog...")
+            # Try to trigger login dialog on parent MainWindow
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, "_on_login_clicked"):
+                    try:
+                        parent._on_login_clicked()
+                    except Exception:
+                        pass
+                    break
+                parent = parent.parent()
+            return
+
         # Validate parameters
         is_valid, error_msg = self._validate_params()
         if not is_valid:

@@ -366,9 +366,7 @@ if __name__ == "__main__":
     #login.sso_login()
     # import core.project_status as project_status
     # project_status.main()
-    import core.revenue_accrual as revenue_accrual
-    revenue_accrual.main()
-    '''
+
     util.init_workdir()
 
     exit_code = main()
@@ -379,4 +377,4 @@ if __name__ == "__main__":
         # Only print completion message for CLI mode
         pass
     sys.exit(exit_code)
-    '''
+

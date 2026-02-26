@@ -5,7 +5,7 @@ import os
 import tools.util as util
 
 # 你的 Asana Personal Access Token
-ACCESS_TOKEN = "2/1210190277961957/1211118508618456:b77803d1519340d597e0befc7d423c10"
+
 DOWNLOAD_FOLDER = "vendor_invoice"
 util.check_folder(DOWNLOAD_FOLDER)
 

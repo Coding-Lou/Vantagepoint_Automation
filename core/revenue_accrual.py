@@ -556,6 +556,87 @@ def download_project_list():
     except Exception as e:
         print("⚠️ Failed to download the contract:", e)
 
+
+def download_vp_revgen():
+    try:
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
+        baseRecordSelection = {"pKey":None,"name":"Records Selected","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"ChargeType","value":"R","type":"dropdown","seq":1,"tableName":"PR","condition":"and","searchLevel":1,"valueDescription":"Regular"}]}
+        payload = {"reportPath":"/Standard/Project/Office Earnings","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseChart3D":"N","baseChartColumn":"unb1","baseChartDivisor":"1","baseChartFontSize":8,"baseChartHeight":3,"baseChartLabelLines":"N","baseChartLabels":"none","baseChartLeft":1,"baseChartLegendPosition":"righttop","baseChartSeriesColumn2":"","baseChartSeriesColumn3":"","baseChartShowPosition":"1","baseChartTitle":"","baseChartTop":0.5,"baseChartType":"none","baseChartWidth":6,"baseChartXTitle":"Biller Number","baseChartYTitle":"Labour Unbilled Amount","baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"M/d/yyyy","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"N","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"Office Earnings","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"Y","baseShowTotalsOnHeader":"Y","baseStartColumnPosition":2,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[{"label":"Biller Number","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"biller","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Status","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"projectStatus","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Primary Client Name","sort":"ASC","color":"000000","subTotal":"N","showHeading":"Y","pageHeading":"N","collapseExpand":"E","line":"None","pageBreak":"N","groupID":"clientName","customGridColumnSort":"","groupWBSLevel":"1"},{"label":"Project Number","sort":"ASC","color":"000080","subTotal":"Y","showHeading":"Y","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"projectNumber","customGridColumnSort":"","groupWBSLevel":"1"}],"ReportColumns":[{"heading":"Labour Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb1","username":"","customGridColumnSort":""},{"heading":"Hardware Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb2","username":"","customGridColumnSort":""},{"heading":"Software Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb3","username":"","customGridColumnSort":""},{"heading":"Outside Services Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb4","username":"","customGridColumnSort":""},{"heading":"Others (Expenses) Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb5","username":"","customGridColumnSort":""},{"heading":"Other Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unbOther","username":"","customGridColumnSort":""},{"heading":"Unbilled","width":0.85,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"unb","username":"","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":baseRecordSelection,"baseCreateActivity":"N","baseShowDetail":"Y","baseLeft1":0,"baseRight1":21,"baseLeft2":0,"baseRight2":8,"baseLeft3":0,"baseRight3":8,"baseSub":"1","rollType":"Project","CurrentWBSActivityActiveWBS1Only":"N","CurrentWBSActivityActiveWBS2Only":"N","CurrentWBSActivityActiveWBS3Only":"N","CurrentWBSActivityActivityRange":"1","CurrentWBSActivityInclInvoiceActivity":"N","drillDownSort":"1","budgetSelection":"1","ETCDRadioChecked":"radioETCD1","atCost":"2","labDrillDown":"1","expDrillDown":"1","showCur":"N","showYTD":"N","showJTD":"Y","custDate":"N","LabelCustDate":"Period Range","showOverhead":"N","estimateOverhead":"N","showUnposted":"N","chkIncludeCommitPO":"N","useSummaryTable":"N","excludeContractsNotinFees":"N","CurrentWBSActivityCheckLabor":"Y","CurrentWBSActivityCheckExpense":"Y","PrintDirects":"Y","ETCDate":"5/16/2024 1:38:16 PM","baseChartColumnDisplayTimeframe":"JTD","SummaryTableLastUpdate":"","CurrentWBSActivityUnpostedLabor":"N","CurrentWBSActivityCommittedExp":"N","_desc_saveOptionRole":["","","","",""],"saveOptionRole":["ACCOUNTING","CONTROLLER-RO","[CREATOR_USERNAME]","ACCOUNTANT","CONTROLLER"],"baseOriginalFavoriteId":"98fdd0394b294d66bbdbf1c4592e1ad4"}}
+
+        response = requests.post(url, headers=HEADERS, json=payload  )
+        data = response.json()
+        report_path_raw = data["return"]["ReportPath"]
+        report_path = report_path_raw.replace(" ", "%20")
+
+        # Step 2: Get Nonce
+        nonceUrl = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+        payload = {}
+        response = requests.post(nonceUrl, headers=HEADERS, json=payload  )
+        nonce = response.json()
+
+        # Step 3: Get Viewer
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&ResetReportViewerOnPreview=Y&reportPath="+report_path+"&allowSchedule=Y&origReportPath=/Standard/Project/Office%20Earnings&reportName=Office%20Earnings"
+
+        # Step 4: Get report session
+        response = requests.get(url, headers=HEADERS )
+        html = response.text
+        report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
+        control_id = re.search(r"ControlID=([A-Za-z0-9]+)", html)
+        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+
+        if not (report_session and control_id):
+            raise RuntimeError("Error")
+        
+        exportFileName_csv = "VP Rev_gen_"+ date.today().strftime("%Y-%m-%d") + ".csv"
+
+        # Step 5: Download the csv report
+        url = ( "https://qcadeltek03.qcasystems.com"
+                "/Vantagepoint/Reporting/Reserved.ReportViewerWebControl.axd"
+                f"?ReportSession={report_session.group(1)}"
+                "&Culture=1033&CultureOverrides=True"
+                "&UICulture=2057&UICultureOverrides=True"
+                "&ReportStack=1"
+                f"&ControlID={control_id.group(1)}"
+                "&RSProxy=https%3a%2f%2fqcadeltek03.qcasystems.com%2fReportServer"
+                "&OpType=Export&FileName=Office+Earnings&ContentDisposition=OnlyHtmlInline&Format=CSV" )
+        
+        response = requests.get(url, headers = HEADERS,stream=True  )
+        if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
+            csvName = os.path.join("revenue accural", exportFileName_csv)
+            if os.path.exists(csvName):
+                os.remove(csvName)
+            with open(csvName, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            print("✅ "+ csvName+" Downloaded")
+
+        # Trim the csv file
+        temp_file = csvName + ".temp"
+        lines_to_skip = 4
+        with open(csvName, 'r', encoding='utf-8', newline='') as f_in, \
+            open(temp_file, 'w', encoding='utf-8', newline='') as f_out:
+                reader = csv.reader(f_in)
+                writer = csv.writer(f_out)
+                for _ in range(lines_to_skip):
+                    next(reader, None)
+                for row in reader:
+                    if all(cell == "" for cell in row[9:16]):
+                        continue
+                    projectNum = row[7].split("Project Number:")[1].strip()
+                    projectNum = projectNum.split()[0]
+                    row[7] = projectNum
+                    filtered_row = [row[7]] + row[9:16]
+                    writer.writerow(filtered_row)
+        os.replace(temp_file, csvName)
+        
+        targetFile = os.path.join("revenue accural", TEMPLETE3)
+        util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="VP RevGen csv", onlyValue=True, targetCell='A2')
+
+    except Exception as e:
+        print("⚠️ Failed to download the contract:", e)
+
 def final_step():
     targetFile = os.path.join("revenue accural", TEMPLETE3)
 
@@ -574,6 +655,7 @@ def final_step():
     util.excel_full_copy(inputFile=inputFile, inputSheet="Budget", targetFile=targetFile, targetSheet="Budget", onlyValue=True, targetCell='I2')
 
 def main():
+
     LOGIN = util.check_login()
     while not LOGIN:
         login.sso_login()
@@ -588,8 +670,11 @@ def main():
     period = input("Please input the period (202607): ")
     print("Pre step 0: generate the project list for the search options")
     download_invoice_YTD()
+    print(f"Checking invoice register, now total {len(project_list)} projects touched.")
     download_GL(startPeriod = '202601', endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
+    print(f"Checking GL with 4*** and 5***, now total {len(project_list)} projects touched.")
     download_labour_details_YTD()
+    print(f"Checking Labour hours, now total {len(project_list)} projects touched.")
     print(f"unique project number: {len(project_list)}")
 
     print("--------------------------------------")
@@ -618,8 +703,10 @@ def main():
     print("Step 4: Generate 6 New Model_Earned Revenue Accrual.xlsx")
     generate_new_file(TEMPLETE3)
     download_project_list()
-
+    download_vp_revgen()
     final_step()
+
+    
 
 if __name__ == '__main__':
     main()

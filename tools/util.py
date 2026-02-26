@@ -579,8 +579,9 @@ def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue, t
         excel.CutCopyMode = False
         #ws_target.Rows(f"{last_row + 1}:{ws_target.Rows.Count}").Delete()
         wb_target.Save()
-        print(f"Data copied to {targetFile} in sheet {targetSheet} starting at {final_dest.Address}")
-        wb_target.RefreshAll()
+        print(f"Data copied to {targetFile} in sheet {targetSheet} starting at {targetCell}")
+        #wb_target.RefreshAll()
+
     finally:
         if wb_input: wb_input.Close(False)
         if wb_target: wb_target.Close(True)
