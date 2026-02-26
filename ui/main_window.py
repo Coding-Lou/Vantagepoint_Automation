@@ -5,7 +5,8 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 import json
 import time
-
+import ctypes
+from ctypes import wintypes
 #region agent log
 
 DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
@@ -137,6 +138,32 @@ except Exception:
     pass
 #endregion
 
+# 定义 FLASHWINFO 结构
+class FLASHWINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.UINT),
+        ("hwnd", wintypes.HWND),
+        ("dwFlags", wintypes.DWORD),
+        ("uCount", wintypes.UINT),
+        ("dwTimeout", wintypes.DWORD),
+    ]
+
+FLASHW_STOP = 0
+FLASHW_CAPTION = 0x00000001
+FLASHW_TRAY = 0x00000002
+FLASHW_ALL = FLASHW_CAPTION | FLASHW_TRAY
+FLASHW_TIMERNOFG = 0x0000000C
+
+def flash_window(widget: QWidget, count: int = 5):
+    hwnd = int(widget.winId())
+    fInfo = FLASHWINFO(
+        cbSize=ctypes.sizeof(FLASHWINFO),
+        hwnd=hwnd,
+        dwFlags=FLASHW_ALL | FLASHW_TIMERNOFG,
+        uCount=count,
+        dwTimeout=0,
+    )
+    ctypes.windll.user32.FlashWindowEx(ctypes.byref(fInfo))
 
 class CustomAvatarWidget(NavigationWidget):
     """Custom avatar widget for navigation bar bottom"""
@@ -274,7 +301,6 @@ class CustomTitleBar(TitleBar):
     
     def setIcon(self, icon):
         self.iconLabel.setPixmap(QIcon(icon).pixmap(18, 18))
-
 
 # Import SettingsPage
 from ui.widgets.settings_page import SettingsPage
@@ -715,7 +741,7 @@ class MainWindow(FluentWindow):
             page._set_execution_enabled(True)
         self.current_worker = None
         self.setWindowTitle("QCA Accounting Automation Tool")
-        
+        flash_window(self, count=10)
         # Show completion dialog when task finished successfully
         try:
             success = bool(result.get("success"))

@@ -377,4 +377,3 @@ if __name__ == "__main__":
         # Only print completion message for CLI mode
         pass
     sys.exit(exit_code)
-

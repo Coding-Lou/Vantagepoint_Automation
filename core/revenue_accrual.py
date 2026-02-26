@@ -20,6 +20,13 @@ TEMPLETE1 = "1 2 3 JTD Billing.xlsx"
 TEMPLETE2 = "4 5 Budget %Complete.xlsx"
 TEMPLETE3 = "6 New Model_Earned Revenue Accrual.xlsx"
 
+def update_templete():
+    save_dir = os.path.join("revenue accural", "templete")
+    util.download_from_gdrive(file_id= "1PnuEvp3_rMfcDVb_qTXYn2ykbRYiS4_-", file_name="0 JTD Billed Invoice Summary.xlsx", save_dir=save_dir)
+    util.download_from_gdrive(file_id= "1ds3nFA01TvC072hLLA-7EzgEEI4erhfb", file_name="1 2 3 JTD Billing.xlsx", save_dir=save_dir)
+    util.download_from_gdrive(file_id= "1ypRmWC6eYsYG_Kg8Ut64c5mheDICccPB", file_name="4 5 Budget %Complete.xlsx", save_dir=save_dir)
+    util.download_from_gdrive(file_id= "1bstqKI9GU3JqknlKtnHp4CHzD0Gb9Dce", file_name="6 New Model_Earned Revenue Accrual.xlsx", save_dir=save_dir)
+
 def append_to_project_list(url, columnName, needFilter = False):
     global project_list
     response = requests.get(url, headers = HEADERS,stream=True)
@@ -384,16 +391,12 @@ def download_JTD_Billing(pkey = "", option_name = ""):
 
         with open(csvName, 'r', encoding='utf-8', newline='') as f_in, \
             open(temp_file, 'w', encoding='utf-8', newline='') as f_out:
-        
             reader = csv.reader(f_in)
             writer = csv.writer(f_out)
-
             for _ in range(lines_to_skip):
                 next(reader, None)
-
             for row in reader:
                 filtered_row = row[1:10]
-
                 writer.writerow(filtered_row)
 
         os.replace(temp_file, csvName)
@@ -655,7 +658,6 @@ def final_step():
     util.excel_full_copy(inputFile=inputFile, inputSheet="Budget", targetFile=targetFile, targetSheet="Budget", onlyValue=True, targetCell='I2')
 
 def main():
-
     LOGIN = util.check_login()
     while not LOGIN:
         login.sso_login()
@@ -665,10 +667,18 @@ def main():
     global project_list
     project_list = set()
 
+    period = input("Please input the period (202607): ")
+
+    print("Pre step 0: Initialize")
     util.check_folder("revenue accural")
     util.clear_folder("revenue accural")
-    period = input("Please input the period (202607): ")
-    print("Pre step 0: generate the project list for the search options")
+    if not os.path.exists(os.path.join("revenue accural", "templete")):
+        os.makedirs(os.path.join("revenue accural", "templete"))
+        print(f"📁 Folder created: templete")
+        update_templete()
+
+    print("--------------------------------------")
+    print("Step 1: Generate the project list for the search options")
     download_invoice_YTD()
     print(f"Checking invoice register, now total {len(project_list)} projects touched.")
     download_GL(startPeriod = '202601', endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
@@ -680,14 +690,14 @@ def main():
     print("--------------------------------------")
     generate_new_file(TEMPLETE0)
     pkey, option_name = search_options(project_list)
-    print("Step 1: Generate 0-JTD Billed Invoice Summary.xlsx")
+    print("Step 2: Generate 0-JTD Billed Invoice Summary.xlsx")
     download_invoice_pretax(pkey, option_name)
     csvName = download_GL(startPeriod='200301', endPeriod=period, needDownload=True, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"4"}]}, fileName="4XXXX ")
     targetFile = os.path.join("revenue accural", TEMPLETE0)
     util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="General Ledger Export", onlyValue=True)
 
     print("--------------------------------------")
-    print("Step 2: Generate 1 2 3 JTD Billing.xlsx")
+    print("Step 3: Generate 1 2 3 JTD Billing.xlsx")
     generate_new_file(TEMPLETE1)
     targetFile = os.path.join("revenue accural", TEMPLETE1)
     csvName = download_GL(startPeriod='200301', endPeriod=period, needDownload=True, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Name","value":"USD","type":"string","seq":1,"tableName":"CA","opp":"LIKE","condition":"or","searchLevel":0,"valueDescription":"USD"},{"name":"Name","value":"USA","type":"string","seq":2,"tableName":"CA","opp":"LIKE","condition":"and","searchLevel":0,"valueDescription":"USA"}]}, fileName="US ")
@@ -695,18 +705,16 @@ def main():
     download_JTD_Billing(pkey, option_name)
 
     print("--------------------------------------")
-    print("Step 3: Generate 4 5 Budget %Complete.xlsx")
+    print("Step 4: Generate 4 5 Budget %Complete.xlsx")
     generate_new_file(TEMPLETE2)
     download_contract(pkey, option_name)
 
     print("--------------------------------------")
-    print("Step 4: Generate 6 New Model_Earned Revenue Accrual.xlsx")
+    print("Step 5: Generate 6 New Model_Earned Revenue Accrual.xlsx")
     generate_new_file(TEMPLETE3)
     download_project_list()
     download_vp_revgen()
-    final_step()
-
-    
+    final_step()    
 
 if __name__ == '__main__':
     main()

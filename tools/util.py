@@ -542,6 +542,7 @@ def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue, t
     excel = win32.DispatchEx("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
+    excel.ScreenUpdating = False
     wb_input = None
     wb_target = None
 
@@ -585,4 +586,32 @@ def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue, t
     finally:
         if wb_input: wb_input.Close(False)
         if wb_target: wb_target.Close(True)
+        excel.ScreenUpdating = True
         excel.Quit()
+
+
+def download_from_gdrive(file_id, file_name, save_dir):
+    base_url = "https://drive.google.com/uc?export=download"
+    session = requests.Session()
+
+    # Step 1: initial request
+    response = session.get(base_url, params={"id": file_id}, stream=True)
+
+    # Step 2: check for large file confirmation token
+    for key, value in response.cookies.items():
+        if key.startswith("download_warning"):  
+            params = {"id": file_id, "confirm": value}
+            response = session.get(base_url, params=params, stream=True)
+            break
+
+    # Step 3: ensure directory exists
+    os.makedirs(save_dir, exist_ok=True)
+    full_path = os.path.join(save_dir, file_name)
+
+    # Step 4: write file in chunks
+    with open(full_path, "wb") as f:
+        for chunk in response.iter_content(32768):
+            if chunk:
+                f.write(chunk)
+
+    print(f"{file_name} downloaded.")
