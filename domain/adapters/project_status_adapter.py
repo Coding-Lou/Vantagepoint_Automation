@@ -50,7 +50,13 @@ class ProjectStatusAdapter(BaseAdapter):
         period: str,
         use_filter: bool,
         project_names: str,
-        start_year: Optional[int] = None
+        start_year: Optional[int] = None,
+        download_invoices: bool = True,
+        download_project_earnings: bool = True,
+        download_expenses: bool = True,
+        download_labor_hours: bool = True,
+        download_office_earnings: bool = True,
+        download_open_po: bool = True
     ) -> Dict[str, Any]:
         """
         Execute project status report generation task.
@@ -61,6 +67,12 @@ class ProjectStatusAdapter(BaseAdapter):
             project_names: Comma-separated project names string (only used when use_filter is False)
             start_year: Year to use for start date filter (only used when use_filter is True). 
                        If None, defaults to current year - 3.
+            download_invoices: Whether to download invoice register
+            download_project_earnings: Whether to download project earnings
+            download_expenses: Whether to download expenses
+            download_labor_hours: Whether to download labor hours
+            download_office_earnings: Whether to download office earnings
+            download_open_po: Whether to download open purchase orders
             
         Returns:
             Result dictionary with success status and output file path
@@ -154,48 +166,72 @@ class ProjectStatusAdapter(BaseAdapter):
                 util_module.clear_folder(ps_dir)
                 if self.log_callback:
                     self.log_callback("INFO", f"Prepared output directory: {ps_dir}")
-                
+                copy_to_templete = download_expenses and download_invoices and download_labor_hours and download_project_earnings and download_open_po
                 # Initialize output
-                ps_module.init_output()
+                ps_module.update_templete(r"C:\\temp\\project status", copy_to_templete)
                 if self.log_callback:
                     self.log_callback("INFO", "Initialized output workbook")
                 
-                # Download reports
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Invoice Register...")
-                ps_module.download_invoices()
-                
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Project Earnings...")
-                ps_module.download_earnings()
-                
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Project Expenses...")
-                ps_module.download_expenses()
-                
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Labor Hours...")
-                ps_module.download_labor_hours()
-
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Purchase Orders...")
-                # Only download purchase orders if we have projects (manual mode)
-                # Purchase orders require specific project names, so skip if using filter mode
-                if projects:
-                    ps_module.download_purchase_orders(projects)
+                # Download reports based on user selection
+                if download_invoices:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Invoice Register...")
+                    ps_module.download_invoices(copy_to_templete)
                 else:
                     if self.log_callback:
-                        self.log_callback("INFO", "Skipping purchase orders (filter mode - no specific projects)")
+                        self.log_callback("INFO", "Skipping Invoice Register (not selected)")
+                
+                if download_project_earnings:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Project Earnings...")
+                    ps_module.download_earnings(copy_to_templete)
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping Project Earnings (not selected)")
+                
+                if download_expenses:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Project Expenses...")
+                    ps_module.download_expenses(copy_to_templete)
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping Project Expenses (not selected)")
+                
+                if download_labor_hours:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Labor Hours...")
+                    ps_module.download_labor_hours(copy_to_templete)
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping Labor Hours (not selected)")
 
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading Office Earnings...")
-                ps_module.download_office_earnings()
+                if download_open_po:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Purchase Orders...")
+                    # Only download purchase orders if we have projects (manual mode)
+                    # Purchase orders require specific project names, so skip if using filter mode
+                    if projects:
+                        ps_module.downloand_open_po(projects, copy_to_templete)
+                    else:
+                        if self.log_callback:
+                            self.log_callback("WARNING", "Skipping purchase orders (filter mode - no specific projects)")
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping Purchase Orders (not selected)")
+
+                if download_office_earnings:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Downloading Office Earnings...")
+                    ps_module.download_office_earnings()
+                else:
+                    if self.log_callback:
+                        self.log_callback("INFO", "Skipping Office Earnings (not selected)")
                 
-                # Delete default sheet
-                if self.log_callback:
-                    self.log_callback("INFO", "Finalizing output file...")
-                ps_module.delete_default_sheet()
+                if copy_to_templete:
+                    ps_module.copy_to_template()
                 
+                ps_module.move_to_folder()
+
                 # Get output file path
                 from datetime import date
                 output_file = os.path.join(ps_dir, f"output_{date.today().strftime('%Y-%m-%d')}.xlsx")

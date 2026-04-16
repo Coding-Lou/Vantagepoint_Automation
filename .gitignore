@@ -20,3 +20,5 @@ edge_profile/
 __pycache__/
 dist/
 *.xlk
+CLAUDE.md
+*.zip

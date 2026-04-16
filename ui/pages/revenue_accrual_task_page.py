@@ -3,10 +3,11 @@ Revenue Accrual task page with modern Fluent Design.
 
 Task: Generate revenue accrual workbooks.
 """
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 from PySide6.QtWidgets import (
     QVBoxLayout,
+    QHBoxLayout,
 )
 from PySide6.QtCore import Qt
 
@@ -14,14 +15,44 @@ from qfluentwidgets import (
     ComboBox,
     LineEdit,
     BodyLabel,
+    PrimaryPushButton,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
 from ui.utils.theme_colors import ThemeColors
 from workers.revenue_accrual_worker import RevenueAccrualWorker
+from workers.base_worker import BaseWorker
 from ui.services.app_context import get_app_context
 import tools.util as util_module
 import core.project_status as ps_module
+import core.revenue_accrual as revenue_accrual_module
+
+
+class UpdateRevGenWorker(BaseWorker):
+    """Worker for executing update_revgen in background thread."""
+    
+    def __init__(self):
+        """Initialize Update Rev-Gen worker."""
+        super().__init__("revenue_accrual.update_revgen", {}, auto_login_enabled=False)
+    
+    def execute(self) -> Dict[str, Any]:
+        """Execute update_revgen method."""
+        try:
+            self.log_signal.emit("INFO", "Starting Rev-Gen update...")
+            # Execute the update_revgen function
+            revenue_accrual_module.update_revgen()
+            self.log_signal.emit("SUCCESS", "Rev-Gen update completed successfully")
+            return {
+                "success": True,
+                "message": "Rev-Gen update completed successfully"
+            }
+        except Exception as e:
+            error_msg = str(e)
+            self.log_signal.emit("ERROR", f"Rev-Gen update failed: {error_msg}")
+            return {
+                "success": False,
+                "message": f"Rev-Gen update failed: {error_msg}"
+            }
 
 
 class RevenueAccrualTaskPage(BaseTaskPage):
@@ -43,6 +74,12 @@ class RevenueAccrualTaskPage(BaseTaskPage):
         # Connect to login state changes to reload periods when user logs in
         app_context = get_app_context()
         app_context.login_state_changed.connect(self._on_login_state_changed)
+        
+        # Initialize update revgen worker
+        self.update_revgen_worker: Optional[UpdateRevGenWorker] = None
+        
+        # Add Update Rev-Gen button above Execution Log
+        self._add_update_revgen_button()
 
     def _get_page_description(self) -> str:
         """Get page description."""
@@ -199,4 +236,118 @@ class RevenueAccrualTaskPage(BaseTaskPage):
     def _create_worker(self, params: Dict[str, Any]) -> RevenueAccrualWorker:
         """Create Revenue Accrual worker."""
         return RevenueAccrualWorker(params)
+    
+    def _add_update_revgen_button(self) -> None:
+        """Add Update Rev-Gen button above Execution Log section."""
+        # Find the log_card in the content_layout and insert button before it
+        content_layout = self._content_widget.layout()
+        if not content_layout:
+            return
+        
+        # Find the index of log_card in the layout
+        log_card_index = -1
+        for i in range(content_layout.count()):
+            item = content_layout.itemAt(i)
+            if item and item.widget() == self.log_card:
+                log_card_index = i
+                break
+        
+        if log_card_index < 0:
+            return
+        
+        # Create button card
+        from qfluentwidgets import CardWidget
+        button_card = CardWidget(self._content_widget)
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(16, 16, 16, 16)
+        button_layout.setSpacing(12)
+        
+        # Create Update Rev-Gen button
+        self.update_revgen_btn = PrimaryPushButton("Update Rev-Gen", button_card)
+        self.update_revgen_btn.setMinimumWidth(120)
+        self.update_revgen_btn.setMinimumHeight(36)
+        self.update_revgen_btn.clicked.connect(self._on_update_revgen_clicked)
+        
+        button_layout.addWidget(self.update_revgen_btn)
+        button_layout.addStretch()
+        
+        button_card.setLayout(button_layout)
+        
+        # Insert button card before log_card
+        content_layout.insertWidget(log_card_index, button_card)
+    
+    def _on_update_revgen_clicked(self) -> None:
+        """Handle Update Rev-Gen button click."""
+        # Check login status before running
+        try:
+            is_logged_in = bool(util_module.check_login())
+        except Exception:
+            is_logged_in = False
+
+        if not is_logged_in:
+            self._append_log("WARNING", "Login required. Opening sign-in dialog...")
+            # Try to trigger login dialog on parent MainWindow
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, "_on_login_clicked"):
+                    try:
+                        parent._on_login_clicked()
+                    except Exception:
+                        pass
+                    break
+                parent = parent.parent()
+            return
+
+        # Check if worker is already running
+        if self.update_revgen_worker and self.update_revgen_worker.isRunning():
+            self._append_log("WARNING", "Rev-Gen update is already running. Please wait for completion.")
+            return
+
+        # Clean up any existing worker
+        if self.update_revgen_worker:
+            try:
+                self.update_revgen_worker.log_signal.disconnect()
+            except Exception:
+                pass
+            try:
+                self.update_revgen_worker.finished.disconnect()
+            except Exception:
+                pass
+            self.update_revgen_worker = None
+
+        # Create and start worker
+        self.update_revgen_worker = UpdateRevGenWorker()
+        self.update_revgen_worker.log_signal.connect(self._on_log_received)
+        self.update_revgen_worker.finished.connect(self._on_update_revgen_finished)
+        
+        # Update UI state
+        self.update_revgen_btn.setEnabled(False)
+        self.log_viewer.clear()
+        self._append_log("INFO", "Starting Rev-Gen update...")
+        
+        # Start worker in background thread
+        self.update_revgen_worker.start()
+    
+    def _on_update_revgen_finished(self, result: Dict[str, Any]) -> None:
+        """Handle update revgen worker finished signal."""
+        # Disconnect signals
+        if self.update_revgen_worker:
+            try:
+                self.update_revgen_worker.log_signal.disconnect()
+            except Exception:
+                pass
+            try:
+                self.update_revgen_worker.finished.disconnect()
+            except Exception:
+                pass
+            self.update_revgen_worker = None
+        
+        # Update UI state
+        self.update_revgen_btn.setEnabled(True)
+        
+        if result.get("success"):
+            self._append_log("SUCCESS", "Rev-Gen update completed successfully")
+        else:
+            error_msg = result.get("message", "Unknown error")
+            self._append_log("ERROR", f"Rev-Gen update failed: {error_msg}")
 

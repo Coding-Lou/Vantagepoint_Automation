@@ -3,6 +3,7 @@ import requests
 import re
 import os
 import csv
+from json import JSONDecodeError
 from openpyxl import Workbook
 from datetime import datetime
 import zipfile
@@ -36,6 +37,17 @@ STATEMENTDATE = None
 def format_amount(val):
     return f"{val:,.2f}" if val and val > 0 else ""
 
+def _safe_json(response, context):
+    """Parse response JSON with actionable error context."""
+    try:
+        return response.json()
+    except (JSONDecodeError, ValueError):
+        body_preview = (response.text or "").strip().replace("\n", " ")[:200]
+        raise RuntimeError(
+            f"{context} returned non-JSON response "
+            f"(status={response.status_code}, url={response.url}, body='{body_preview}')"
+        )
+
 def ar_init():
     util.check_folder("ar_export")
     util.clear_folder("ar_export")
@@ -59,7 +71,7 @@ def ar_download_csv():
         payload = {"reportPath":"/Standard/AccountsReceivable/AR Statement","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"M/d/yyyy","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"Y","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"AR Statement","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"N","baseStartColumnPosition":1,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[],"ReportColumns":[{"heading":"Number","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Invoice","username":"","customGridColumnSort":""},{"heading":"Date","width":0.8,"format":"M/d/yyyy","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"InvoiceDate","username":"","customGridColumnSort":""},{"heading":"Due Date","width":0.8,"format":"M/d/yyyy","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"DueDate","username":"","customGridColumnSort":""},{"heading":"Invoiced","width":0.8,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"OriginalAmt","username":"","customGridColumnSort":""},{"heading":"Balance Due","width":0.8,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Balance","username":"","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":"","baseShowDetail":"Y","statementType":"C","radioSD":"radioSD3","radioAU":"InvoiceDate","gracePeriod":"30","firmAlign":"Center","showClientMemo":"N","printLongName":"N","printFirmName":"Y","printByLine":"Y","printAddress":"Y","printProjName":"Y","printProjDesc":"Y","printProjNumber":"N","printFooter":"Y","showInvoiceLeadingZeros":"Y","excludeUReceipts":"Y","byLine":"","address1":"#101 6951 72 Street","address2":"Delta, BC","address3":"V4G 0A2","address4":"","HeaderMsg":"","footerMsg":"QCA Systems Ltd.    \nMain Office: #101 6951 72 Street, Delta, BC, V4G 0A2          Phone: (604)-940-0868          Fax: (604)-940-0869\nNorth Shore Office: #201 197 Forester Street, North Vancouver, BC, V7H 0A6\nAll Invoices are due upon receipt","PrintContactFirstName":"Y","PrintContactLastName":"Y","PrintContactMiddleName":"N","PrintContactPreferredName":"N","PrintContactPrefix":"N","PrintContactSuffix":"N","PrintContactTitle":"N","invoiceAddressee":"1","showFooter":"Y","statementSummary":"Y","agingSummary":"Y","clientSelName":"","MarginAndImages":"[{\"ImageID\":\"Our Firm Block\",\"Type\":\"FirmAddress\",\"TopPosition\":0.07,\"LeftPosition\":2.23,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":1,\"Selected\":\"Y\"},{\"ImageID\":\"Client Address\",\"Type\":\"ClientAddress\",\"TopPosition\":1.55,\"LeftPosition\":0,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":2,\"Selected\":\"Y\"},{\"ImageID\":\"Date Block\",\"Type\":\"DateBlock\",\"TopPosition\":1.17,\"LeftPosition\":5.63,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":3,\"Selected\":\"Y\"},{\"ImageID\":\"Statement Label\",\"Type\":\"StatementLabel\",\"TopPosition\":0.03,\"LeftPosition\":0.04,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":4,\"Selected\":\"Y\"}]","ageDays1":"30","ageDays2":"60","ageDays3":"90","ageDays4":"120","ageDays5":"150","statementDate":STATEMENTDATE+"T00:00:00.000","_desc_saveOptionRole":["","","","",""],"saveOptionRole":["ACCOUNTING","ACCOUNTANT","CONTROLLER","CONTROLLER-RO","[CREATOR_USERNAME]"],"baseOriginalFavoriteId":"DA82BA5C8CD94E2CAD6A96814CC49C5C"}}
 
         response = requests.post(url, headers=HEADERS,json=payload  )
-        data = response.json()
+        data = _safe_json(response, "AR statement build API")
         report_path_raw = data["return"]["ReportPath"]
         report_path = report_path_raw.replace(" ", "%20")
 
@@ -68,7 +80,7 @@ def ar_download_csv():
         payload = {}
 
         response = requests.post(url, headers=HEADERS, json=payload  )
-        nonce = response.json()
+        nonce = _safe_json(response, "AR nonce API")
 
         # Step 3: Get Viewer
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx??&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=AR%20Statement"
@@ -136,49 +148,53 @@ def ar_process():
         global DUEINVOICE
         DUEINVOICE = ""
         if (not "QCA Systems Ltd." in clientName):
-            print("-----" + clientName + "-----")
-            clientID = util.get_clientID(clientName)
-            data = ar_review(clientID)
-            email = util.get_vendor_email(clientID)
-            if email != '': 
-                print("✅ Vendor email: " + email)
-            else:
-                print("❌ " + clientName + " mail not found")
-            fileName = ar_download_statement_pdf(clientID, clientName)
-            if fileName != '': 
-                print("✅ Vendor's statement download")
-            else:
-                print("❌ Error")
-            pmList = ""
-            if ( (data['Age2'] != "" and int(data['Age2']) > 0) or 
-                (data['Age3'] != "" and int(data['Age3']) > 0) or 
-                (data['Age4'] != "" and int(data['Age4']) > 0) or 
-                (data['Age5'] != "" and int(data['Age5']) > 0) ):
-                pmList = ar_get_pm_list(clientID)
+            try:
+                print("-----" + clientName + "-----")
+                clientID = util.get_clientID(clientName)
+                data = ar_review(clientID)
+                email = util.get_vendor_email(clientID)
+                if email != '':
+                    print("✅ Vendor email: " + email)
+                else:
+                    print("❌ " + clientName + " mail not found")
+                fileName = ar_download_statement_pdf(clientID, clientName)
+                if fileName != '':
+                    print("✅ Vendor's statement download")
+                else:
+                    print("❌ Error")
+                pmList = ""
+                if ( (data['Age2'] != "" and int(data['Age2']) > 0) or
+                    (data['Age3'] != "" and int(data['Age3']) > 0) or
+                    (data['Age4'] != "" and int(data['Age4']) > 0) or
+                    (data['Age5'] != "" and int(data['Age5']) > 0) ):
+                    pmList = ar_get_pm_list(clientID)
 
-            tableContent = '<table border="1" width="500" style="border-collapse: collapse"><thead><tr style="text-align: center;"><th>Invoice</th><th>0-30</th><th>31-45</th><th>46-60</th><th>61-90</th><th>90+</th></tr></thead><tbody>'
-            tableContent += ar_generate_invoices_table(clientID)
-            tableContent += "</tbody></table>"
-            ar_create_record(clientID, clientName, email, fileName, pmList, tableContent)
-            ar_details(clientID)
-            if ar_need_zip(clientID, clientName):
-                zipClientName.append(clientName)
-            print(f"{'Client':<30} {'0-30':>12} {'31-45':>12} {'46-60':>12} {'61-90':>12} {'90+':>12}")
-            print("----------------------------------------------------------------------------------------------------------------")
-            print(f"{clientName[:30]:<30} "
-                  f"${data['Age1']:>12,.2f} "
-                  f"${data['Age2']:>12,.2f} "
-                  f"${data['Age3']:>12,.2f} "
-                  f"${data['Age4']:>12,.2f} "
-                  f"${data['Age5']:>12,.2f} ")
-            print("")
+                tableContent = '<table border="1" width="500" style="border-collapse: collapse"><thead><tr style="text-align: center;"><th>Invoice</th><th>0-30</th><th>31-45</th><th>46-60</th><th>61-90</th><th>90+</th></tr></thead><tbody>'
+                tableContent += ar_generate_invoices_table(clientID)
+                tableContent += "</tbody></table>"
+                ar_create_record(clientID, clientName, email, fileName, pmList, tableContent)
+                ar_details(clientID)
+                if ar_need_zip(clientID, clientName):
+                    zipClientName.append(clientName)
+                print(f"{'Client':<30} {'0-30':>12} {'31-45':>12} {'46-60':>12} {'61-90':>12} {'90+':>12}")
+                print("----------------------------------------------------------------------------------------------------------------")
+                print(f"{clientName[:30]:<30} "
+                      f"${data['Age1']:>12,.2f} "
+                      f"${data['Age2']:>12,.2f} "
+                      f"${data['Age3']:>12,.2f} "
+                      f"${data['Age4']:>12,.2f} "
+                      f"${data['Age5']:>12,.2f} ")
+                print("")
+            except Exception as e:
+                print(f"❌ Error processing client {clientName}: {e}")
+                continue
     return zipClientName
 
 def ar_review(clientID):
     try:
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID +"?sumColumns=Total%2CAge1%2CAge2%2CAge3%2CAge4%2CAge5%2CTax%2CInterest%2CRetainage%2CRetainers"
         response = requests.get(url, headers = HEADERS)
-        data = response.json()
+        data = _safe_json(response, f"AR review API for client {clientID}")
         return data[0]
     except Exception as e:
         print("❌ Error in get full invoice of vendor " + clientID)
@@ -186,7 +202,7 @@ def ar_review(clientID):
 def ar_details(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
-    records = response.json()
+    records = _safe_json(response, f"AR details API for client {clientID}")
     for r in records:
         if r['Total'] <= 0 or clientID in EXCLUDE:
             continue
@@ -200,7 +216,7 @@ def ar_download_statement_pdf(clientID, clientName):
         payload = {"reportPath":"/Standard/AccountsReceivable/AR Statement","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"M/d/yyyy","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"Y","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"AR Statement","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"N","baseStartColumnPosition":1,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[],"ReportColumns":[{"heading":"Number","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Invoice","username":"","customGridColumnSort":""},{"heading":"Date","width":0.8,"format":"M/d/yyyy","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"InvoiceDate","username":"","customGridColumnSort":""},{"heading":"Due Date","width":0.8,"format":"M/d/yyyy","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"DueDate","username":"","customGridColumnSort":""},{"heading":"Invoiced","width":0.8,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"OriginalAmt","username":"","customGridColumnSort":""},{"heading":"Balance Due","width":0.8,"format":"###T###T###D##;(###T###T###D##);#","align":"right","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Balance","username":"","customGridColumnSort":""}],"ReportSections":[],"baseRecordSelection":"","baseShowDetail":"Y","statementType":"C","radioSD":"radioSD3","radioAU":"InvoiceDate","gracePeriod":"30","firmAlign":"Center","showClientMemo":"N","printLongName":"N","printFirmName":"Y","printByLine":"Y","printAddress":"Y","printProjName":"Y","printProjDesc":"Y","printProjNumber":"N","printFooter":"Y","showInvoiceLeadingZeros":"Y","excludeUReceipts":"Y","byLine":"","address1":"#101 6951 72 Street","address2":"Delta, BC","address3":"V4G 0A2","address4":"","HeaderMsg":"","footerMsg":"QCA Systems Ltd.    \nMain Office: #101 6951 72 Street, Delta, BC, V4G 0A2          Phone: (604)-940-0868          Fax: (604)-940-0869\nNorth Shore Office: #201 197 Forester Street, North Vancouver, BC, V7H 0A6\nAll Invoices are due upon receipt","PrintContactFirstName":"Y","PrintContactLastName":"Y","PrintContactMiddleName":"N","PrintContactPreferredName":"N","PrintContactPrefix":"N","PrintContactSuffix":"N","PrintContactTitle":"N","invoiceAddressee":"1","showFooter":"Y","statementSummary":"Y","agingSummary":"Y","clientSelName":{"pKey":"","name":"","type":"client","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"selectedResultIds","value":clientID,"type":"client","seq":1,"searchLevel":0,"valueDescription":""}]},"MarginAndImages":"[{\"ImageID\":\"Our Firm Block\",\"Type\":\"FirmAddress\",\"TopPosition\":0.07,\"LeftPosition\":2.23,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":1,\"Selected\":\"Y\"},{\"ImageID\":\"Client Address\",\"Type\":\"ClientAddress\",\"TopPosition\":1.55,\"LeftPosition\":0,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":2,\"Selected\":\"Y\"},{\"ImageID\":\"Date Block\",\"Type\":\"DateBlock\",\"TopPosition\":1.17,\"LeftPosition\":5.63,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":3,\"Selected\":\"Y\"},{\"ImageID\":\"Statement Label\",\"Type\":\"StatementLabel\",\"TopPosition\":0.03,\"LeftPosition\":0.04,\"ColBand\":\"Header\",\"ImageWidth\":0,\"ImageHeight\":0,\"Item\":4,\"Selected\":\"Y\"}]","ageDays1":"30","ageDays2":"60","ageDays3":"90","ageDays4":"120","ageDays5":"150","statementDate": STATEMENTDATE + "T00:00:00.000","_desc_saveOptionRole":["","","","",""],"saveOptionRole":["ACCOUNTING","ACCOUNTANT","CONTROLLER","CONTROLLER-RO","[CREATOR_USERNAME]"],"baseOriginalFavoriteId":"DA82BA5C8CD94E2CAD6A96814CC49C5C"}}
 
         response = requests.post(url, headers=HEADERS, json=payload  )
-        data = response.json()
+        data = _safe_json(response, f"Statement PDF build API for client {clientID}")
         report_path_raw = data["return"]["ReportPath"]
         report_path = report_path_raw.replace(" ", "%20")
 
@@ -208,7 +224,7 @@ def ar_download_statement_pdf(clientID, clientName):
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
         payload = {}
         response = requests.post(url, headers=HEADERS, json=payload  )
-        nonce = response.json()
+        nonce = _safe_json(response, f"Statement PDF nonce API for client {clientID}")
 
         # Step 4: Get Viewer
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx??&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=AR%20Statement"
@@ -258,7 +274,7 @@ def ar_billing_term(projectId):
     projectIdClear = util.cleanup_projectID(projectId)
     url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/BillingTermsBO/{projectIdClear}?meta=channel%2Caccess"
     response = requests.get(url, headers = HEADERS)
-    data = response.json()
+    data = _safe_json(response, f"Billing terms API for project {projectIdClear}")
     return int(data[0].get('DaysBeforeDue') or 30)
 
 def ar_check_due(invoice):
@@ -269,7 +285,7 @@ def ar_check_due(invoice):
 def ar_generate_invoices_table(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
-    records = response.json()
+    records = _safe_json(response, f"AR review list API for client {clientID}")
     message = ""
     global DUEINVOICE
     AGE_FIELDS = ["Age1", "Age2", "Age3", "Age4", "Age5"]
@@ -282,7 +298,7 @@ def ar_generate_invoices_table(clientID):
 
         url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ projectID +"/"+ clientID +"/ARReviewDetail"
         response = requests.get(url, headers=HEADERS)
-        invoices = response.json()
+        invoices = _safe_json(response, f"AR review detail API for project {projectID} and client {clientID}")
         rows = []
         due_invoices = []
         for invoice in invoices:
@@ -315,7 +331,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
     projectName = util.cleanup_projectName(projectID)
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ projectIDConverted +"/"+ clientId +"/ARReviewDetail"
     response = requests.get(url, headers=HEADERS)
-    invoices = response.json()
+    invoices = _safe_json(response, f"Project invoice detail API for project {projectIDConverted} and client {clientId}")
     for invoice in invoices: 
         if abs(invoice['Total']) < 1e-9:
             continue
@@ -338,7 +354,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
                 ar_create_record(clientId, "", "", fileName, "", "")
                 continue
 
-            data = response.json()
+            data = _safe_json(response, f"Interactive detail API for invoice {invoice['InvoiceNumber']}")
 
             report_path_raw = data["ReportPath"]
             report_path = report_path_raw.replace(" ", "%20")
@@ -346,7 +362,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
             url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
             payload = {}
             response = requests.post(url, headers=HEADERS, json=payload  )
-            nonce = response.json()
+            nonce = _safe_json(response, f"Invoice nonce API for invoice {invoice['InvoiceNumber']}")
 
              # Step 4: Get Viewer
             url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx??&nonce="+nonce+"&reportPath="+report_path+"&allowSchedule=N&reportName=Invoice&embedded=Y&runtimeParameters%5B0%5D%5BshowBillingBackup%5D=1&runtimeParameters%5B1%5D%5BPreInvoice%5D=N&runtimeParameters%5B2%5D%5BHeaderInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B3%5D%5BMainWBS1%5D="+projectName+"&runtimeParameters%5B4%5D%5BmainWBS1Name%5D=&runtimeParameters%5B5%5D%5BInvoice%5D="+invoice['InvoiceNumber']+"&runtimeParameters%5B6%5D%5BActivePeriod%5D="
@@ -395,16 +411,16 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
 def ar_get_pm_list(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/" + clientID
     response = requests.get(url, headers=HEADERS)
-    projList = response.json()
+    projList = _safe_json(response, f"PM list AR review API for client {clientID}")
     list = set()
     pmList = ""
     for proj in projList:
         if proj['Age2'] > 0 or proj['Age3'] > 0 or proj['Age4'] > 0 or proj['Age5'] > 0:
             projName = proj['WBS1']
             projName = util.cleanup_projectName(projName)
-            url = "https://qcadeltek03.qcasystems.com/vantagepoint/app/project/GetProjectPlan?wbs1="+ projName +"&jtdSearch=N"
+            url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/project/{projName}/plans/liveplan?missingjtd=no"
             response = requests.get(url, headers=HEADERS)
-            data = response.json()
+            data = _safe_json(response, f"Project plan API for project {projName}")[0]
             if data['ProjMgrEmail'] != '': 
                 print("✅ "+ proj['WBS1'] +" is due, PM email: " + data['ProjMgrEmail'])
                 if not data['ProjMgrEmail'] in list:

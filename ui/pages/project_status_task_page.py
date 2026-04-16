@@ -8,7 +8,9 @@ from typing import Dict, Any, Tuple
 from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
-    QButtonGroup,    
+    QButtonGroup,
+    QCheckBox,
+    QVBoxLayout,
 )
 from PySide6.QtCore import Qt
 from datetime import date
@@ -63,7 +65,8 @@ class ProjectStatusTaskPage(BaseTaskPage):
         tutorial_text = BodyLabel(
             "1. Select an accounting period from the dropdown menu.\n"
             "2. Choose to filter by charge type and created date, or manually enter project names.\n"
-            "3. Click 'Execute' to generate the project status report."
+            "3. Select which reports to download using the checkboxes (all selected by default).\n"
+            "4. Click 'Execute' to generate the project status report."
         )
         tutorial_text.setWordWrap(True)
         tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
@@ -222,6 +225,78 @@ class ProjectStatusTaskPage(BaseTaskPage):
         
         # Set initial visibility state (manual mode is default, so project input is visible, year selector is hidden)
         self._on_filter_mode_changed()
+        
+        # Spacer
+        self.config_layout.addSpacing(12)
+        
+        # Download options section
+        download_options_label = BodyLabel("Download Options")
+        download_options_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self.config_layout.addWidget(download_options_label)
+        
+        # Create checkboxes for download options
+        # All checkboxes are checked by default
+        self.checkbox_invoices = QCheckBox("Invoice")
+        self.checkbox_invoices.setChecked(True)
+        self.checkbox_project_earnings = QCheckBox("Project Earnings")
+        self.checkbox_project_earnings.setChecked(True)
+        self.checkbox_expenses = QCheckBox("Expense")
+        self.checkbox_expenses.setChecked(True)
+        self.checkbox_labor_hours = QCheckBox("Labor Hours")
+        self.checkbox_labor_hours.setChecked(True)
+        self.checkbox_office_earnings = QCheckBox("Office Earnings")
+        self.checkbox_office_earnings.setChecked(True)
+        self.checkbox_open_po = QCheckBox("Open PO")
+        self.checkbox_open_po.setChecked(True)
+        
+        # Apply styling to checkboxes
+        checkbox_style = """
+            QCheckBox {
+                padding: 4px;
+                font-size: 12px;
+            }
+            QCheckBox::indicator {
+                width: 16px;
+                height: 16px;
+            }
+        """
+        self.checkbox_invoices.setStyleSheet(checkbox_style)
+        self.checkbox_project_earnings.setStyleSheet(checkbox_style)
+        self.checkbox_expenses.setStyleSheet(checkbox_style)
+        self.checkbox_labor_hours.setStyleSheet(checkbox_style)
+        self.checkbox_office_earnings.setStyleSheet(checkbox_style)
+        self.checkbox_open_po.setStyleSheet(checkbox_style)
+        
+        # Add checkboxes to layout in a grid-like arrangement
+        checkbox_layout = QVBoxLayout()
+        checkbox_layout.setSpacing(8)
+        
+        # First row: Invoice, Project Earnings, Expense
+        row1 = QHBoxLayout()
+        row1.addWidget(self.checkbox_invoices)
+        row1.addWidget(self.checkbox_project_earnings)
+        row1.addWidget(self.checkbox_expenses)
+        row1.addStretch()
+        checkbox_layout.addLayout(row1)
+        
+        # Second row: Labor Hours, Office Earnings, Open PO
+        row2 = QHBoxLayout()
+        row2.addWidget(self.checkbox_labor_hours)
+        row2.addWidget(self.checkbox_office_earnings)
+        row2.addWidget(self.checkbox_open_po)
+        row2.addStretch()
+        checkbox_layout.addLayout(row2)
+        
+        self.config_layout.addLayout(checkbox_layout)
+        
+        # Update Open PO checkbox state based on current filter mode
+        # (since checkboxes are created after _on_filter_mode_changed was first called)
+        if hasattr(self, 'checkbox_open_po'):
+            is_manual_mode = self.manual_radio.isChecked()
+            self.checkbox_open_po.setEnabled(is_manual_mode)
+            if not is_manual_mode and self.checkbox_open_po.isChecked():
+                # Uncheck if filter mode is selected (since Open PO won't work)
+                self.checkbox_open_po.setChecked(False)
     
     def _load_config(self) -> None:
         """Load configuration from config file (if any)."""
@@ -239,6 +314,14 @@ class ProjectStatusTaskPage(BaseTaskPage):
         if hasattr(self, 'year_combo') and hasattr(self, 'year_label'):
             self.year_label.setVisible(is_filter_mode)
             self.year_combo.setVisible(is_filter_mode)
+        
+        # Enable/disable Open PO checkbox based on mode
+        # Open PO requires specific project names, so it's only available in manual mode
+        if hasattr(self, 'checkbox_open_po'):
+            self.checkbox_open_po.setEnabled(is_manual_mode)
+            if is_filter_mode and self.checkbox_open_po.isChecked():
+                # Uncheck if filter mode is selected (since Open PO won't work)
+                self.checkbox_open_po.setChecked(False)
     
     def _on_login_state_changed(self, is_logged_in: bool) -> None:
         """Handle login state change - reload periods when user logs in."""
@@ -314,6 +397,22 @@ class ProjectStatusTaskPage(BaseTaskPage):
             if not project_list:
                 return False, "Please enter at least one valid project name"
         
+        # Validate that at least one download option is selected
+        has_selection = (
+            self.checkbox_invoices.isChecked() or
+            self.checkbox_project_earnings.isChecked() or
+            self.checkbox_expenses.isChecked() or
+            self.checkbox_labor_hours.isChecked() or
+            self.checkbox_office_earnings.isChecked() or
+            self.checkbox_open_po.isChecked()
+        )
+        if not has_selection:
+            return False, "Please select at least one download option"
+        
+        # If Open PO is selected, validate that we have projects (manual mode required)
+        if self.checkbox_open_po.isChecked() and self.filter_radio.isChecked():
+            return False, "Open PO requires manual project input mode. Please switch to manual mode or uncheck Open PO."
+        
         return True, ""
     
     def _get_params(self) -> Dict[str, Any]:
@@ -346,6 +445,12 @@ class ProjectStatusTaskPage(BaseTaskPage):
             "use_filter": use_filter,  # True if filtering by charge type and created date
             "project_names": projects_text,  # Comma-separated string (empty if use_filter is True)
             "start_year": selected_year,  # Selected year for filter (only used when use_filter is True)
+            "download_invoices": self.checkbox_invoices.isChecked(),
+            "download_project_earnings": self.checkbox_project_earnings.isChecked(),
+            "download_expenses": self.checkbox_expenses.isChecked(),
+            "download_labor_hours": self.checkbox_labor_hours.isChecked(),
+            "download_office_earnings": self.checkbox_office_earnings.isChecked(),
+            "download_open_po": self.checkbox_open_po.isChecked(),
         }
     
     def _create_worker(self, params: Dict[str, Any]) -> ProjectStatusWorker:

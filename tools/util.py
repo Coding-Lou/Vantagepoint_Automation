@@ -1,16 +1,59 @@
 import json
+import shutil
+import time
+import threading
+import tempfile
 from pypdf import PdfReader, PdfWriter
 from pathlib import Path
 import os
 import requests
 from openpyxl.worksheet.table import Table
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 import pandas as pd
 import subprocess
 import glob
 import sys
-import win32com.client as win32
-from win32com.client import constants
+import win32com.client
+import pythoncom
+
+# Shared lock — prevents concurrent reads from seeing a half-written config file.
+# config_manager.py imports this same lock so all config I/O is serialized.
+_config_lock = threading.Lock()
+
+
+def _atomic_write_config(config_path: Path, data: dict) -> None:
+    """Write config atomically: write to a temp file then os.replace."""
+    dir_ = config_path.parent
+    fd, tmp_path = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, config_path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _read_config_with_retry(config_path: Path, retries: int = 3, delay: float = 0.05) -> dict:
+    """Read and parse config.json, retrying on empty/invalid content."""
+    for attempt in range(retries):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if content.strip():
+                return json.loads(content)
+        except (json.JSONDecodeError, OSError):
+            pass
+        if attempt < retries - 1:
+            time.sleep(delay)
+    raise ValueError(f"Invalid JSON format in config file: Expecting value : line 1 column 1 (char 0)")
+
 
 def show_welcome_banner():
     banner = rf"""
@@ -72,19 +115,15 @@ def get_config(klist):
         except Exception:
             pass
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        node = config
-        for key in klist:
-            if key not in node: 
-                node[key] = ""
-            node = node[key]
-
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-            
+        with _config_lock:
+            config = _read_config_with_retry(config_path)
+            node = config
+            for key in klist:
+                if key not in node:
+                    node[key] = ""
+                node = node[key]
+            _atomic_write_config(config_path, config)
         return node
-    
     except Exception as e:
         print(f"⚠️ Get config failed")
         return None
@@ -107,17 +146,11 @@ def set_config(key, value):
         except Exception:
             pass
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        config[key] = value
-
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-            f.flush()
-
+        with _config_lock:
+            config = _read_config_with_retry(config_path)
+            config[key] = value
+            _atomic_write_config(config_path, config)
         print(f"💾 {key} been updated to {value}. ")
-
     except Exception as e:
         print(f"⚠️ {key} updated failed: ", e)
 
@@ -530,88 +563,190 @@ def cleanup_projectName(projName: str) -> str:
         projName = projName.replace(k, v)
     return projName
 
-def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue, targetCell='A1'):
-    if not os.path.exists(inputFile):
-        raise FileNotFoundError(f"Input file not found: {inputFile}")
-    if not os.path.exists(targetFile):
-        raise FileNotFoundError(f"Target file not found: {targetFile}")
-    
-    inputFile = os.path.abspath(inputFile)
-    targetFile = os.path.abspath(targetFile)
 
-    excel = win32.DispatchEx("Excel.Application")
-    excel.Visible = False
-    excel.DisplayAlerts = False
-    excel.ScreenUpdating = False
-    wb_input = None
+def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue,
+                    targetCell='A1', refreshAll=True,
+                    excel_instance=None, target_wb_instance=None):
+
+    _com_initialized = False
+    if excel_instance is None:
+        pythoncom.CoInitialize()
+        _com_initialized = True
+        excel = win32com.client.DispatchEx("Excel.Application")
+        excel.Visible = False
+        excel.DisplayAlerts = False
+        excel.AlertBeforeOverwriting = False
+    else:
+        excel = excel_instance
+
+    inputFile = os.path.abspath(inputFile)
+
+    CALLEE_BUSY     = -2147418111
+    SERVER_DISC     = -2147220995
+    MAX_RETRIES     = 15          # bumped up slightly for busy spikes
+    RETRY_SLEEP     = 2
+
+    def robust_call(func, *args, **kwargs):
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                hresult = getattr(e, 'hresult', None)
+                if hresult == SERVER_DISC:
+                    raise                        # unrecoverable
+                if hresult == CALLEE_BUSY:
+                    if attempt < MAX_RETRIES - 1:
+                        time.sleep(RETRY_SLEEP)
+                        continue
+                    raise Exception("Excel still busy after max retries") from e
+                raise                            # any other error → propagate immediately
+        raise Exception("Excel Busy: max retries exceeded")
+
+    def safe_close_wb(wb, save: bool):
+        """Close a workbook, retrying on CALLEE_BUSY, swallowing everything else."""
+        try:
+            robust_call(wb.Close, save)
+        except Exception:
+            pass
+
+    wb_input  = None
     wb_target = None
 
     try:
-        wb_input = excel.Workbooks.Open(inputFile)
-        ws_input = wb_input.Worksheets(1) if inputFile.lower().endswith(".csv") else wb_input.Worksheets(inputSheet)
-        
-        source_range = ws_input.UsedRange
-        if source_range is None:
-            print(f"No data found in {inputFile}")
-            return
+        wb_input  = robust_call(excel.Workbooks.Open, inputFile)
+        ws_input  = (wb_input.Worksheets(1)
+                     if inputFile.lower().endswith(".csv")
+                     else wb_input.Worksheets(inputSheet))
 
-        wb_target = excel.Workbooks.Open(targetFile)
+        wb_target = (target_wb_instance
+                     or robust_call(excel.Workbooks.Open, os.path.abspath(targetFile)))
+
+        _ = wb_target.Name   # sanity-check the COM object is alive
+
         try:
             ws_target = wb_target.Worksheets(targetSheet)
-        except:
+        except Exception:
             ws_target = wb_target.Worksheets.Add()
             ws_target.Name = targetSheet
 
+        robust_call(ws_input.UsedRange.Copy)
+        print(f"{inputFile} / {inputSheet} copied to {targetFile} / {targetSheet}")
 
-        anchor_range = ws_target.Range(targetCell)
-        target_col = anchor_range.Column
-        base_row = anchor_range.Row
-        last_row = ws_target.Cells(ws_target.Rows.Count, target_col).End(-4162).Row
-    
-        final_dest = ws_target.Cells(base_row, target_col)
+        paste_type = -4163 if onlyValue else -4104
+        robust_call(ws_target.Range(targetCell).PasteSpecial, Paste=paste_type)
+        robust_call(setattr, excel, 'CutCopyMode', False)   # ← now retried too
 
-        source_range.Copy()
- 
-        if onlyValue:
-            final_dest.PasteSpecial(Paste=-4163)
-        else:
-            final_dest.PasteSpecial(Paste=-4104)
+        if refreshAll:
+            robust_call(wb_target.RefreshAll)               # ← now retried too
+            robust_call(excel.CalculateUntilAsyncQueriesDone)
 
-        excel.CutCopyMode = False
-        #ws_target.Rows(f"{last_row + 1}:{ws_target.Rows.Count}").Delete()
-        wb_target.Save()
-        print(f"Data copied to {targetFile} in sheet {targetSheet} starting at {targetCell}")
-        #wb_target.RefreshAll()
+        if target_wb_instance is None:
+            robust_call(wb_target.Save)
+            print(f"✅ Saved: {targetSheet}")
 
     finally:
-        if wb_input: wb_input.Close(False)
-        if wb_target: wb_target.Close(True)
-        excel.ScreenUpdating = True
-        excel.Quit()
+        # Always close the input workbook (we opened it, we close it)
+        if wb_input is not None:
+            safe_close_wb(wb_input, False)
 
+        # Only close / quit things we ourselves opened
+        if target_wb_instance is None:
+            if wb_target is not None:
+                safe_close_wb(wb_target, True)
+            try:
+                robust_call(excel.Quit)
+            except Exception:
+                pass
+            if _com_initialized:
+                pythoncom.CoUninitialize()
 
 def download_from_gdrive(file_id, file_name, save_dir):
     base_url = "https://drive.google.com/uc?export=download"
     session = requests.Session()
-
-    # Step 1: initial request
+    # Step 1: Initial request
     response = session.get(base_url, params={"id": file_id}, stream=True)
-
-    # Step 2: check for large file confirmation token
+    # Step 2: Extract confirmation token if it exists
+    # Google Drive uses a "confirm" parameter for large files
+    token = None
     for key, value in response.cookies.items():
-        if key.startswith("download_warning"):  
-            params = {"id": file_id, "confirm": value}
-            response = session.get(base_url, params=params, stream=True)
+        if key.startswith("download_warning"):
+            token = value
             break
+    # If token not in cookies, try to find it in the response text (for very large files)
+    if not token:
+        # We only check the first few bytes to avoid loading the whole file into memory
+        content = response.text
+        if 'confirm=' in content:
+            token = content.split('confirm=')[1].split('&')[0].split('"')[0]
 
-    # Step 3: ensure directory exists
-    os.makedirs(save_dir, exist_ok=True)
-    full_path = os.path.join(save_dir, file_name)
+    if token:
+        params = {"id": file_id, "confirm": token}
+        response = session.get(base_url, params=params, stream=True)
 
-    # Step 4: write file in chunks
-    with open(full_path, "wb") as f:
-        for chunk in response.iter_content(32768):
-            if chunk:
-                f.write(chunk)
+    # Step 3: Ensure directory exists using Path for better compatibility
+    save_path = Path(save_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    full_path = save_path / file_name
 
-    print(f"{file_name} downloaded.")
+    # Step 4: Write file in chunks and check for success
+    if response.status_code == 200:
+        with open(full_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=32768):
+                if chunk:
+                    f.write(chunk)
+        print(f"✅ {file_name} successfully downloaded to {save_dir}")
+    else:
+        print(f"❌ Failed to download {file_name}. Status code: {response.status_code}")
+
+def get_currency_rate(period, currency):
+    year = int(period[:4])
+    period = int(period[4:])
+    base_date = datetime(year, 3, 1)
+    month_offset = period - 12
+    real_date = base_date + relativedelta(months=month_offset)
+    url = f"https://www.bankofcanada.ca/valet/observations/group/FX_RATES_MONTHLY/json?start_date={real_date.strftime('%Y-%m')}-01"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"Error fetching data: {e}, return rate 1.0")
+        return 1.0
+    key = "FXM" + currency + "CAD"
+    target_date = real_date.strftime('%Y-%m') + "-01"
+
+    for obs in data.get("observations", []):
+        if obs.get("d") == target_date:
+            return float(obs.get(key, {}).get("v"))
+        
+    return 1.0
+
+def move_and_replace_files(source_dir, target_dir):
+    src_path = Path(source_dir).resolve()
+    dst_path = Path(target_dir).resolve()
+
+    if not src_path.exists():
+        print(f"❌ Source directory does not exist: {src_path}")
+        return
+
+    dst_path.mkdir(parents=True, exist_ok=True)
+
+    print(f"🚚 Moving files from {src_path} to {dst_path}...")
+
+    for item in src_path.iterdir():
+        if item.is_file():
+            dest_file = dst_path / item.name
+            
+            try:
+                if dest_file.exists():
+                    dest_file.unlink()
+                
+                shutil.move(str(item), str(dest_file))
+                print(f"✅ Moved: {item.name}")
+                
+            except PermissionError:
+                print(f"❌ Permission Denied: Could not move {item.name}. File might be open.")
+            except Exception as e:
+                print(f"❌ Error moving {item.name}: {e}")
+
+    print("🏁 All files processed.")

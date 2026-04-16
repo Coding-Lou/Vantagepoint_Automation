@@ -184,3 +184,5 @@ def main():
     ap_process_remittance(paymentsData)
     util.save_excel(wb, RECORDS)
 
+if __name__ == '__main__':
+    main()

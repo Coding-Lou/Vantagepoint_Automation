@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 import sys
 from typing import List, Any, Optional
+from tools.util import _config_lock, _atomic_write_config, _read_config_with_retry
 
 
 def get_runtime_dir() -> Path:
@@ -68,17 +69,14 @@ def get_config_value(key_path: List[str]) -> Optional[Any]:
     """
     config_path = get_config_path()
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        # Navigate through nested keys
+        with _config_lock:
+            config = _read_config_with_retry(config_path)
         node = config
         for key in key_path:
             if isinstance(node, dict) and key in node:
                 node = node[key]
             else:
                 return None
-        
         return node
     except Exception as e:
         print(f"⚠️ Error reading config: {e}")
@@ -105,28 +103,17 @@ def update_config_value(key_path: List[str], value: Any) -> bool:
     """
     config_path = get_config_path()
     try:
-        # Read current config
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        # Navigate to the parent node, creating missing keys as needed
-        node = config
-        for key in key_path[:-1]:
-            if not isinstance(node, dict):
-                node = {}
-            if key not in node:
-                node[key] = {}
-            node = node[key]
-        
-        # Update the final value
-        final_key = key_path[-1]
-        node[final_key] = value
-        
-        # Save updated config
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-            f.flush()
-        
+        with _config_lock:
+            config = _read_config_with_retry(config_path)
+            node = config
+            for key in key_path[:-1]:
+                if not isinstance(node, dict):
+                    node = {}
+                if key not in node:
+                    node[key] = {}
+                node = node[key]
+            node[key_path[-1]] = value
+            _atomic_write_config(config_path, config)
         return True
     except Exception as e:
         print(f"⚠️ Error updating config: {e}")
@@ -153,36 +140,22 @@ def update_multiple_config_values(updates: dict) -> bool:
     """
     config_path = get_config_path()
     try:
-        # Read current config
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        
-        # Apply all updates
-        for key_path, value in updates.items():
-            # Convert key_path to list if needed
-            if isinstance(key_path, tuple):
-                key_path = list(key_path)
-            elif isinstance(key_path, str):
-                key_path = [key_path]
-            
-            # Navigate to the parent node, creating missing keys as needed
-            node = config
-            for key in key_path[:-1]:
-                if not isinstance(node, dict):
-                    node = {}
-                if key not in node:
-                    node[key] = {}
-                node = node[key]
-            
-            # Update the final value
-            final_key = key_path[-1]
-            node[final_key] = value
-        
-        # Save updated config
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-            f.flush()
-        
+        with _config_lock:
+            config = _read_config_with_retry(config_path)
+            for key_path, value in updates.items():
+                if isinstance(key_path, tuple):
+                    key_path = list(key_path)
+                elif isinstance(key_path, str):
+                    key_path = [key_path]
+                node = config
+                for key in key_path[:-1]:
+                    if not isinstance(node, dict):
+                        node = {}
+                    if key not in node:
+                        node[key] = {}
+                    node = node[key]
+                node[key_path[-1]] = value
+            _atomic_write_config(config_path, config)
         return True
     except Exception as e:
         print(f"⚠️ Error updating multiple config values: {e}")

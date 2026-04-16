@@ -121,6 +121,7 @@ from ui.pages.ar_task_page import ARTaskPage
 from ui.pages.project_status_task_page import ProjectStatusTaskPage
 from ui.pages.revenue_accrual_task_page import RevenueAccrualTaskPage
 from ui.pages.statement_check_task_page import StatementCheckTaskPage
+from ui.pages.report_export_task_page import ReportExportTaskPage
 from ui.pages.base_task_page import BaseTaskPage
 from ui.pages.scheduled_tasks_page import ScheduledTasksPage
 from ui.services.app_context import get_app_context
@@ -630,6 +631,7 @@ class MainWindow(FluentWindow):
         self.task_pages["project_status"] = ProjectStatusTaskPage()
         self.task_pages["revenue_accrual"] = RevenueAccrualTaskPage()
         self.task_pages["statement_check"] = StatementCheckTaskPage()
+        self.task_pages["report_export"] = ReportExportTaskPage()
 
         # Add task pages to navigation and stacked widget
         for task_id, page in self.task_pages.items():
@@ -639,7 +641,7 @@ class MainWindow(FluentWindow):
                 # Load theme-aware monochrome icons for task pages, with FluentIcon fallback
                 def load_icon(icon_name: str):
                     icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-                    suffix = "_light" if isDarkTheme() else "_dark"
+                    suffix = "_dark" if isDarkTheme() else "_light"
                     svg_path = icons_dir / f"{icon_name}{suffix}.svg"
                     if svg_path.exists():
                         return QIcon(str(svg_path))
@@ -660,6 +662,7 @@ class MainWindow(FluentWindow):
                     "project_status": load_icon("project_status"),
                     "revenue_accrual": load_icon("revenue_accrual"),
                     "statement_check": load_icon("statement_check"),
+                    "report_export": load_icon("report_export"),
                 }
                 icon = icon_map.get(task_id, FluentIcon.DOCUMENT)
                 
@@ -1013,7 +1016,7 @@ class MainWindow(FluentWindow):
 
                         def _load_nav_icon(icon_name: str, default_icon: FluentIcon) -> QIcon:
                             icons_dir = Path(__file__).resolve().parent.parent / "resources" / "icons"
-                            suffix = "_light" if isDarkTheme() else "_dark"
+                            suffix = "_dark" if isDarkTheme() else "_light"
                             svg_path = icons_dir / f"{icon_name}{suffix}.svg"
                             if svg_path.exists():
                                 return QIcon(str(svg_path))

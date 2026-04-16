@@ -1,5 +1,6 @@
-import tools.util as util
-import tools.form_notifier as form_notifier
+import util
+import form_notifier
+import login
 import requests
 import os
 import re
@@ -128,7 +129,10 @@ def get_distribution(masterKey):
         response = requests.get(url, headers=HEADERS)
 
         data = response.json()
-        return data["WBS1"]
+        projectNums = []
+        for d in data:
+            projectNums.append(d["WBS1"])
+        return projectNums
     except Exception as e:
         print(f"Get receiving list from masterkey {masterKey} had error {e}")
 
@@ -142,12 +146,23 @@ def get_pm_details(projectNum):
     except Exception as e:
         print(f"Get receiving list from masterkey {projectNum} had error {e}")
 
-def get_requester_email(shortName):
+def check_emp_status(shortName):
     try:
         url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/employee/{shortName}"
         response = requests.get(url, headers=HEADERS)
         data = response.json()[0]
-        return data["EMail"]
+        return data["TerminationDate"] == ""
+    except Exception as e:
+        print(f"Check {shortName} still working for QCA had error {e}")
+
+def get_requester_email(shortName):
+    try:
+        if check_emp_status(shortName):
+            url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/employee/{shortName}"
+            response = requests.get(url, headers=HEADERS)
+            data = response.json()[0]
+            return data["EMail"]
+        return ""
     except Exception as e:
         print(f"Get requester email {shortName} had error {e}")
 
@@ -182,12 +197,23 @@ def iterateLineItems():
                 if po not in poInfoDict:
                     masterKey = get_master_key(po)
                     projectNums = get_distribution(masterKey)
+                    projMgrName = ""
                     projMgrEmail = ""
                     for projectNum in projectNums:
                         projectDetails = get_pm_details(projectNum)
-                        projMgrName = projectDetails["ProjMgrName"].split(" ")[0]
-                        projMgrEmail = projMgrEmail + projectDetails["ProjMgrEmail"] +"; "
+                        if projectDetails["ProjMgrName"].split(" ")[0] not in projMgrName:
+                            projMgrName = projMgrName + projectDetails["ProjMgrName"].split(" ")[0] + " "
+                        projMgrId = projectDetails["ProjMgr"]
+                        if check_emp_status(projMgrId) and projectDetails["ProjMgrEmail"] not in projMgrEmail:
+                            projMgrEmail = projMgrEmail + projectDetails["ProjMgrEmail"] +"; "
 
+                        # Special Case
+                        if projectNum == "Q-8315SR6":
+                            if "sahiba.chadha@qcasystems.com" not in projMgrEmail:
+                                projMgrEmail = projMgrEmail + "; sahiba.chadha@qcasystems.com"
+
+                    if projMgrEmail == "":
+                        projMgrEmail = "adhaliwal@qcasystems.com"
                     poInfoDict[po] = {
                         "projMgrName": projMgrName,
                         "projMgrEmail": projMgrEmail,
@@ -233,7 +259,7 @@ def iterateLineItems():
             
                 if row["detail_Requestor"]:
                     pmData['cc'].add(get_requester_email(row["detail_Requestor"]))
-
+                
         for pm, data in bodyDict.items():
             ccList = str(CC)
             for email in data["cc"]:
@@ -273,12 +299,16 @@ def iterateLineItems():
 def init():
     global DATE
     DATE = datetime.now(ZoneInfo("America/Vancouver")).strftime("%Y-%m-%d")
-    #DATE = "2026-03-24"
+    #DATE = "2026-04-14"
     global HEADERS
     HEADERS = util.set_headers()
 
 def main():
     try:
+        LOGIN = util.check_login()
+        while not LOGIN:
+            login.sso_login()
+            LOGIN = util.check_login()
         init()
         download_receive_report()
         iterateLineItems()
@@ -297,6 +327,6 @@ def main():
             message= f"Daily receiving report task failed with error: {e}"
         )
 
-
 if __name__ == "__main__":
+    util.show_welcome_banner()
     main()

@@ -74,7 +74,13 @@ class ProjectStatusWorker(BaseWorker):
                 period=self.params.get("period"),
                 use_filter=self.params.get("use_filter", False),
                 project_names=self.params.get("project_names", ""),
-                start_year=self.params.get("start_year")
+                start_year=self.params.get("start_year"),
+                download_invoices=self.params.get("download_invoices", True),
+                download_project_earnings=self.params.get("download_project_earnings", True),
+                download_expenses=self.params.get("download_expenses", True),
+                download_labor_hours=self.params.get("download_labor_hours", True),
+                download_office_earnings=self.params.get("download_office_earnings", True),
+                download_open_po=self.params.get("download_open_po", True)
             )
             #region agent log
             _agent_log_local("ProjectStatusWorker execute result", {"success": bool(result.get("success"))})

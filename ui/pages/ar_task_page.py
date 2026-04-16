@@ -166,13 +166,15 @@ class ARTaskPage(BaseTaskPage):
     
     def _validate_params(self) -> Tuple[bool, str]:
         """Validate task parameters."""
-        if not self.date_edit.date().isValid():
+        selected_date = self.date_edit.date if isinstance(self.date_edit.date, QDate) else self.date_edit.date()
+        if not selected_date.isValid():
             return False, "Please select a valid statement date"
         return True, ""
     
     def _get_params(self) -> Dict[str, Any]:
         """Get task parameters from UI."""
-        date = self.date_edit.date().toString("yyyy-MM-dd")
+        selected_date = self.date_edit.date if isinstance(self.date_edit.date, QDate) else self.date_edit.date()
+        date = selected_date.toString("yyyy-MM-dd")
         
         return {
             "statement_date": date,

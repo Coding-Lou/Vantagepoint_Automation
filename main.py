@@ -14,10 +14,10 @@ import argparse
 from pathlib import Path
 from typing import Optional
 from PySide6.QtCore import QTimer
-
 from tools.runtime_logger import RuntimeLogger
 import tools.util as util
 import tools.login as login
+import os
 # Core modules and schedule_task are imported lazily in run_task_by_flag to avoid import errors
 
 # =========================
@@ -363,9 +363,19 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+
+    '''    
+    import core.revenue_accrual as ra
+    login.sso_login()
+    ra.main()
+
+    import core.project_status as ps
     #login.sso_login()
-    # import core.project_status as project_status
-    # project_status.main()
+    ps.main()
+    
+    import core.daily_received as dr
+    dr.main()
+    '''
 
     util.init_workdir()
 

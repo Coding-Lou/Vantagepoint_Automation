@@ -4,28 +4,60 @@ import tools.util as util
 import requests
 import re
 import os
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
-from openpyxl import Workbook
-from openpyxl import load_workbook
+import win32com.client
 from io import StringIO
 import os
 import random
 import string
 import hashlib
 import shutil
+import pythoncom
+import time
+import getpass
 
 TEMPLETE0 = "0 JTD Billed Invoice Summary.xlsx"
 TEMPLETE1 = "1 2 3 JTD Billing.xlsx"
-TEMPLETE2 = "4 5 Budget %Complete.xlsx"
+TEMPLETE2 = "4 5 Budget _Complete.xlsx"
 TEMPLETE3 = "6 New Model_Earned Revenue Accrual.xlsx"
 
-def update_templete():
-    save_dir = os.path.join("revenue accural", "templete")
-    util.download_from_gdrive(file_id= "1PnuEvp3_rMfcDVb_qTXYn2ykbRYiS4_-", file_name="0 JTD Billed Invoice Summary.xlsx", save_dir=save_dir)
-    util.download_from_gdrive(file_id= "1ds3nFA01TvC072hLLA-7EzgEEI4erhfb", file_name="1 2 3 JTD Billing.xlsx", save_dir=save_dir)
-    util.download_from_gdrive(file_id= "1ypRmWC6eYsYG_Kg8Ut64c5mheDICccPB", file_name="4 5 Budget %Complete.xlsx", save_dir=save_dir)
-    util.download_from_gdrive(file_id= "1bstqKI9GU3JqknlKtnHp4CHzD0Gb9Dce", file_name="6 New Model_Earned Revenue Accrual.xlsx", save_dir=save_dir)
+
+def update_template():
+    username = getpass.getuser()  # safer than os.getlogin()
+
+    source_path = Path(
+        f"C:/Users/{username}/OneDrive - QCA Systems Ltd/"
+        "QCA Accounting Dept - Documents/03 Accounting/"
+        "400 Process Improvement/Automation/templete/Rev-Gen Step1"
+    )
+
+    save_path = Path("C:/temp/revenue_accrual")
+
+    # Validate source
+    if not source_path.exists():
+        print(f"❌ Source does not exist: {source_path}")
+        return
+
+    # Remove destination if it exists
+    if save_path.exists():
+        try:
+            shutil.rmtree(save_path)
+            print(f"💥 Cleared directory: {save_path}")
+        except PermissionError:
+            print(f"❌ Permission denied: {save_path} (file may be open)")
+            return
+        except Exception as e:
+            print(f"❌ Cleanup error: {e}")
+            return
+
+    # Copy fresh
+    try:
+        shutil.copytree(source_path, save_path)
+        print(f"✅ Copied template to: {save_path}")
+    except Exception as e:
+        print(f"❌ Copy failed: {e}")
+
 
 def append_to_project_list(url, columnName, needFilter = False):
     global project_list
@@ -44,7 +76,7 @@ def append_to_project_list(url, columnName, needFilter = False):
         reader = csv.DictReader(StringIO(data_part))
         for row in reader:
             value = row.get(columnName)
-            preCheck = value.startswith("P-") or value.startswith("Q-")
+            preCheck = value is not None
             if needFilter:
                 preCheck = preCheck and (row.get('detail_Name'))
             if preCheck:
@@ -193,7 +225,7 @@ def download_GL(startPeriod, endPeriod, needDownload, baseRecordSelection, fileN
             exportFileName_csv = "General Ledger_"+ fileName + date.today().strftime("%Y-%m-%d") + ".csv"
             response = requests.get(url, headers = HEADERS,stream=True  )
             if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-                csvName = os.path.join("revenue accural", exportFileName_csv)
+                csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
                 if os.path.exists(csvName):
                     os.remove(csvName)
                 with open(csvName, "wb") as f:
@@ -202,7 +234,7 @@ def download_GL(startPeriod, endPeriod, needDownload, baseRecordSelection, fileN
                             f.write(chunk)
 
                 print("✅ "+ csvName+" Downloaded")
-            return csvName
+            return os.path.abspath(csvName)
         else:
             append_to_project_list(url,  "detail_wbs1")
             return None
@@ -210,9 +242,72 @@ def download_GL(startPeriod, endPeriod, needDownload, baseRecordSelection, fileN
     except Exception as e:
         print("⚠️ Failed to download the General Ledger:", e)
 
+def update_rate(rate, file_name):
+    pythoncom.CoInitialize()
+    app = None
+    wb = None
+    target_file = os.path.join(r"C:\\temp\\revenue_accrual", file_name)
+    try:
+        app = win32com.client.DispatchEx("Excel.Application")
+        for _ in range(3):
+            try:
+                app.Visible = False
+                app.DisplayAlerts = False
+                break
+            except:
+                time.sleep(1)
+        max_retries = 5
+        for i in range(max_retries):
+            try:
+                wb = app.Workbooks.Open(target_file)
+                break
+            except Exception as e:
+                if i < max_retries - 1:
+                    print(f"Excel busy, retrying in 10s... ({i+1}/{max_retries})")
+                    time.sleep(10)
+                else:
+                    raise e
+        if wb is not None:
+            names = wb.Names
+            found = False
+            for i in range(1, names.Count + 1):
+                try:
+                    n = names.Item(i)
+                    if n.Name == "USRATE":
+                        target_range = n.RefersToRange
+                        if target_range is not None:
+                            target_range.Value = rate
+                            found = True
+                            break
+                except:
+                    continue
+            if found:
+                wb.Save()
+                print(f"Successfully updated: {file_name}")
+            else:
+                print(f"Warning: 'USRATE' not found in {file_name}")
+
+    except Exception as e:
+        print(f"Critical error processing {file_name}: {e}")
+    
+    finally:
+        if wb is not None:
+            try:
+                wb.Close(SaveChanges=True)
+            except:
+                pass
+        if app is not None:
+            try:
+                app.Quit()
+            except:
+                pass
+        del wb
+        del app
+        pythoncom.CoUninitialize()
+
 def search_options(project_list):
-    random_chars = ''.join(random.choices(string.ascii_letters + string.digits, k=2))
-    name = f"Rev_{date.today()}_{random_chars}"
+    
+    name = f"Rev_{datetime.now().strftime('%Y-%m-%d_%H_%M')}"
     pkey =  hashlib.md5(name.encode('utf-8')).hexdigest()
     try:
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/"
@@ -222,9 +317,7 @@ def search_options(project_list):
             savedOptionsDetail.append({"Seq":1,"ParentKey":pkey,"OptionName":"WBS1","Type":"wbs1","Operator":"=","Value":projectNum,"ValueDescription":"","ReportOption":"N","Condition":"and","TableName":"PR","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":1,"PKey":"","_originalValues":{},"_transType":"I"})
         
         savedOptionsDetail.append({"Seq":-100,"ParentKey":pkey,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"[CREATOR_USERNAME]","ValueDescription":"Myself","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"})
-        #savedOptionsDetail.append({"Seq":-100,"ParentKey":pkey,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"ACCOUNTANT","ValueDescription":"ACCOUNTANT","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"})
-        #savedOptionsDetail.append({"Seq":-100,"ParentKey":pkey,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"ACCOUNTING","ValueDescription":"ACCOUNTING","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"})
-
+  
         payload = {"Name":name,"Type":"wbs1","Private":"Y","Folder":"","LinkedPKey":"","WhereClauseSearch":"N","ResultsToDisplay":"","ListViewDisplay":"","SavedOptionsDetail":savedOptionsDetail, "PKey":pkey,"Username":""}
         response = requests.post(url, headers=HEADERS, json=payload)
 
@@ -280,7 +373,7 @@ def download_invoice_pretax(pkey = "", option_name = ""):
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-            csvName = os.path.join("revenue accural", exportFileName_csv)
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
             if os.path.exists(csvName):
                 os.remove(csvName)
             with open(csvName, "wb") as f:
@@ -290,7 +383,7 @@ def download_invoice_pretax(pkey = "", option_name = ""):
 
             print("✅ "+ csvName+" Downloaded")
 
-        targetFile = os.path.join("revenue accural", TEMPLETE0)
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE0)
         util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Invoice Summary_csv", onlyValue=True)
 
         # Step 6: Download the xlsx report
@@ -306,7 +399,7 @@ def download_invoice_pretax(pkey = "", option_name = ""):
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-            xlsxName = os.path.join("revenue accural", exportFileName_xlsx)
+            xlsxName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_xlsx)
             if os.path.exists(xlsxName):
                 os.remove(xlsxName)
             with open(xlsxName, "wb") as f:
@@ -322,15 +415,16 @@ def download_invoice_pretax(pkey = "", option_name = ""):
 
 def generate_new_file(templateName):
     # Source file path
-    src = os.path.join("revenue accural", "templete", templateName)
+    src = os.path.join(r"C:\\temp\\revenue_accrual", "templete", templateName)
 
     # Destination path (current directory)
-    dst = os.path.join("revenue accural", templateName)
+    dst = os.path.join(r"C:\\temp\\revenue_accrual", templateName)
 
     # Copy file
     shutil.copy(src, dst)
 
 def download_JTD_Billing(pkey = "", option_name = ""):
+    HEADERS = util.set_headers()
     try:
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
         baseRecordSelection = {"pKey": pkey ,"name":option_name ,"type":"wbs1","whereClauseSearch":"N","isLegacy":"N"}
@@ -375,7 +469,7 @@ def download_JTD_Billing(pkey = "", option_name = ""):
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-            csvName = os.path.join("revenue accural", exportFileName_csv)
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
             if os.path.exists(csvName):
                 os.remove(csvName)
             with open(csvName, "wb") as f:
@@ -401,7 +495,7 @@ def download_JTD_Billing(pkey = "", option_name = ""):
 
         os.replace(temp_file, csvName)
         
-        targetFile = os.path.join("revenue accural", TEMPLETE1)
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE1)
         util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="JTD Billing", onlyValue=True, targetCell='B6')
 
     except Exception as e:
@@ -452,7 +546,7 @@ def download_contract(pkey = "", option_name = ""):
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-            csvName = os.path.join("revenue accural", exportFileName_csv)
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
             if os.path.exists(csvName):
                 os.remove(csvName)
             with open(csvName, "wb") as f:
@@ -477,7 +571,7 @@ def download_contract(pkey = "", option_name = ""):
 
         os.replace(temp_file, csvName)
         
-        targetFile = os.path.join("revenue accural", TEMPLETE2)
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE2)
         util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Contract export", onlyValue=True, targetCell='B3')
 
     except Exception as e:
@@ -528,7 +622,7 @@ def download_project_list():
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-            csvName = os.path.join("revenue accural", exportFileName_csv)
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
             if os.path.exists(csvName):
                 os.remove(csvName)
             with open(csvName, "wb") as f:
@@ -553,14 +647,18 @@ def download_project_list():
 
         os.replace(temp_file, csvName)
         
-        targetFile = os.path.join("revenue accural", TEMPLETE3)
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE1)
+        util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Project List", onlyValue=True, targetCell='A2')
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE2)
+        util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Project List", onlyValue=True, targetCell='A2')
+        targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE3)
         util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Project List", onlyValue=True, targetCell='A2')
 
     except Exception as e:
-        print("⚠️ Failed to download the contract:", e)
+        print("⚠️ Failed to update the project list:", e)
 
-
-def download_vp_revgen():
+def download_vp_revgen(update = False):
+    global project_list
     try:
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
         baseRecordSelection = {"pKey":None,"name":"Records Selected","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"ChargeType","value":"R","type":"dropdown","seq":1,"tableName":"PR","condition":"and","searchLevel":1,"valueDescription":"Regular"}]}
@@ -591,6 +689,8 @@ def download_vp_revgen():
             raise RuntimeError("Error")
         
         exportFileName_csv = "VP Rev_gen_"+ date.today().strftime("%Y-%m-%d") + ".csv"
+        if update:
+            exportFileName_csv = "Updated VP Rev_gen_"+ date.today().strftime("%Y-%m-%d") + ".csv"
 
         # Step 5: Download the csv report
         url = ( "https://qcadeltek03.qcasystems.com"
@@ -605,7 +705,7 @@ def download_vp_revgen():
         
         response = requests.get(url, headers = HEADERS,stream=True  )
         if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
-            csvName = os.path.join("revenue accural", exportFileName_csv)
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
             if os.path.exists(csvName):
                 os.remove(csvName)
             with open(csvName, "wb") as f:
@@ -614,10 +714,11 @@ def download_vp_revgen():
                         f.write(chunk)
 
             print("✅ "+ csvName+" Downloaded")
-
+        
         # Trim the csv file
-        temp_file = csvName + ".temp"
+        temp_file =  os.path.join(r"C:\\temp\\revenue_accrual", "temp_"+exportFileName_csv)
         lines_to_skip = 4
+
         with open(csvName, 'r', encoding='utf-8', newline='') as f_in, \
             open(temp_file, 'w', encoding='utf-8', newline='') as f_out:
                 reader = csv.reader(f_in)
@@ -625,39 +726,118 @@ def download_vp_revgen():
                 for _ in range(lines_to_skip):
                     next(reader, None)
                 for row in reader:
-                    if all(cell == "" for cell in row[9:16]):
+                    if len(row) <= 15 or row[15] == "":
                         continue
-                    projectNum = row[7].split("Project Number:")[1].strip()
-                    projectNum = projectNum.split()[0]
+                    if len(row) <= 7 or "Project Number:" not in row[7]:
+                        continue
+                    projectNum = row[7].split("Project Number:")[1].strip().split()[0]
                     row[7] = projectNum
                     filtered_row = [row[7]] + row[9:16]
                     writer.writerow(filtered_row)
-        os.replace(temp_file, csvName)
-        
-        targetFile = os.path.join("revenue accural", TEMPLETE3)
-        util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="VP RevGen csv", onlyValue=True, targetCell='A2')
 
+                    if project_list is not None:
+                        project_list.add(projectNum)
+        
+        os.replace(temp_file, csvName)
     except Exception as e:
-        print("⚠️ Failed to download the contract:", e)
+        print("⚠️", e)
+    finally:
+        pass
 
 def final_step():
-    targetFile = os.path.join("revenue accural", TEMPLETE3)
+    target_dir = r"C:\\temp\\revenue_accrual"
+    targetFile = os.path.join(target_dir, TEMPLETE3)
+    excel = win32com.client.DispatchEx("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    excel.AlertBeforeOverwriting = False
+    
+    target_wb = None
+    try:
+        target_wb = excel.Workbooks.Open(os.path.abspath(targetFile))
+        
+        inputFile1 = os.path.join(target_dir, "0 JTD Billed Invoice Summary.xlsx")
+        util.excel_full_copy(inputFile=inputFile1, inputSheet="2_Billed", 
+                             targetFile=targetFile, targetSheet="2_Billed", 
+                             onlyValue=True, targetCell='A2', refreshAll=False,
+                             excel_instance=excel, target_wb_instance=target_wb) 
 
-    # Copy 2_Billed
-    inputFile = os.path.join("revenue accural", "0 JTD Billed Invoice Summary.xlsx")
-    util.excel_full_copy(inputFile=inputFile, inputSheet="2_Billed", targetFile=targetFile, targetSheet="2_Billed", onlyValue=True, targetCell='A2')
+        inputFile2 = os.path.join(target_dir, "1 2 3 JTD Billing.xlsx")
+        for sheet in ["Billing", "Spent", "WO", "Prop"]:
+            util.excel_full_copy(inputFile=inputFile2, inputSheet=sheet, 
+                                 targetFile=targetFile, targetSheet=sheet, 
+                                 onlyValue=True, targetCell='B2', refreshAll=False,
+                                 excel_instance=excel, target_wb_instance=target_wb)
 
-    # Copy Spent WO Prop
-    inputFile = os.path.join("revenue accural", "1 2 3 JTD Billing.xlsx")
-    util.excel_full_copy(inputFile=inputFile, inputSheet="Spent", targetFile=targetFile, targetSheet="Spent", onlyValue=True, targetCell='B2')
-    util.excel_full_copy(inputFile=inputFile, inputSheet="WO", targetFile=targetFile, targetSheet="WO", onlyValue=True, targetCell='B2')
-    util.excel_full_copy(inputFile=inputFile, inputSheet="Prop", targetFile=targetFile, targetSheet="Prop", onlyValue=True, targetCell='B2')
+        inputFile3 = os.path.join(target_dir, "4 5 Budget %Complete.xlsx")
+        util.excel_full_copy(inputFile=inputFile3, inputSheet="Budget", 
+                             targetFile=targetFile, targetSheet="Budget", 
+                             onlyValue=True, targetCell='I2', refreshAll=False,
+                             excel_instance=excel, target_wb_instance=target_wb)
 
-    # Copy Budget
-    inputFile = os.path.join("revenue accural", "4 5 Budget %Complete.xlsx")
-    util.excel_full_copy(inputFile=inputFile, inputSheet="Budget", targetFile=targetFile, targetSheet="Budget", onlyValue=True, targetCell='I2')
+        file_name = "VP Rev_gen_" + date.today().strftime("%Y-%m-%d") + ".csv"
+        inputFile4 = os.path.join(target_dir, file_name)
+        util.excel_full_copy(inputFile=inputFile4, inputSheet=None, 
+                             targetFile=targetFile, targetSheet="VP RevGen csv", 
+                             onlyValue=True, targetCell='A2', refreshAll=True,
+                             excel_instance=excel, target_wb_instance=target_wb)
+
+        target_wb.Save()
+
+    except Exception as e:
+        print(f"Final Step Error: {e}")
+        raise e
+    finally:
+        if target_wb:
+            try: target_wb.Close(False)
+            except: pass
+        if excel:
+            try: excel.Quit()
+            except: pass
+        
+        source = r"C:\\temp\\revenue_accrual"
+        target = os.path.join(os.getcwd(), "revenue_accrual")
+        util.move_and_replace_files(source_dir=source, target_dir=target)
+
+def update_revgen():
+    LOGIN = util.check_login()
+    while not LOGIN:
+        login.sso_login()
+        LOGIN = util.check_login()
+    global HEADERS
+    HEADERS = util.set_headers()
+    global project_list
+    project_list = set()
+
+    # 1. Initialize the Path object
+    save_path = Path(r"C:\\temp\\revenue_accrual")
+    
+    # 2. If directory exists, clear it completely
+    if save_path.exists():
+        try:
+            shutil.rmtree(save_path)
+            print(f"💥 Cleared entire directory: {save_path}")
+        except PermissionError:
+            print(f"❌ Permission Denied: Could not clear {save_path}. Is an Excel file open?")
+            return  # Stop here if we can't clean the old files
+        except Exception as e:
+            print(f"❌ Error during cleanup: {e}")
+            return
+    # 3. Create the directory fresh
+    try:
+        save_path.mkdir(parents=True, exist_ok=True)
+        print(f"📁 Directory ready: {save_path}")
+    except Exception as e:
+        print(f"❌ Error creating directory: {e}")
+
+    print("Downloading the latest Rev-Gen...")
+    download_vp_revgen(update = True)
+    source = r"C:\\temp\\revenue_accrual"
+    target = os.path.join(os.getcwd(), "revenue_accrual")
+    util.move_and_replace_files(source_dir=source, target_dir=target)
 
 def main():
+
     LOGIN = util.check_login()
     while not LOGIN:
         login.sso_login()
@@ -668,53 +848,66 @@ def main():
     project_list = set()
 
     period = input("Please input the period (202607): ")
+    util.change_period(period)
+    print(f"Report period set to {period}")
+    print("--------------------------------------\n\n")
 
     print("Pre step 0: Initialize")
-    util.check_folder("revenue accural")
-    util.clear_folder("revenue accural")
-    if not os.path.exists(os.path.join("revenue accural", "templete")):
-        os.makedirs(os.path.join("revenue accural", "templete"))
-        print(f"📁 Folder created: templete")
-        update_templete()
+    util.check_folder("revenue_accrual")
+    util.clear_folder("revenue_accrual")
+    
+    update_template()
+    print("Rev-Gen Step 1 Templete Download")
+    
+    print("Fetch the USD/CAD rate")
+    rate = util.get_currency_rate(period, "USD")
+    print(f"{period} USD Rate is : {rate}")
+    update_rate(rate, TEMPLETE1)
+    update_rate(rate, TEMPLETE2)
+
+    download_project_list()
 
     print("--------------------------------------")
     print("Step 1: Generate the project list for the search options")
     download_invoice_YTD()
     print(f"Checking invoice register, now total {len(project_list)} projects touched.")
-    download_GL(startPeriod = '202601', endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
+    if date.today().month > 3:
+        start_period = f"{date.today().year+1}01"
+    else:
+        start_period = f"{date.today().year}01"
+    download_GL(startPeriod = start_period, endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
     print(f"Checking GL with 4*** and 5***, now total {len(project_list)} projects touched.")
     download_labour_details_YTD()
     print(f"Checking Labour hours, now total {len(project_list)} projects touched.")
+    download_vp_revgen()
+    print(f"Checking VantagePoint Revgen, now total {len(project_list)} projects touched.\n")
+
     print(f"unique project number: {len(project_list)}")
 
-    print("--------------------------------------")
-    generate_new_file(TEMPLETE0)
+    print("--------------------------------------\n")
     pkey, option_name = search_options(project_list)
     print("Step 2: Generate 0-JTD Billed Invoice Summary.xlsx")
     download_invoice_pretax(pkey, option_name)
     csvName = download_GL(startPeriod='200301', endPeriod=period, needDownload=True, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"4"}]}, fileName="4XXXX ")
-    targetFile = os.path.join("revenue accural", TEMPLETE0)
+    targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE0)
     util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="General Ledger Export", onlyValue=True)
 
-    print("--------------------------------------")
+    print("--------------------------------------\n")
     print("Step 3: Generate 1 2 3 JTD Billing.xlsx")
-    generate_new_file(TEMPLETE1)
-    targetFile = os.path.join("revenue accural", TEMPLETE1)
+    
+    targetFile = os.path.join(r"C:\\temp\\revenue_accrual", TEMPLETE1)
     csvName = download_GL(startPeriod='200301', endPeriod=period, needDownload=True, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Name","value":"USD","type":"string","seq":1,"tableName":"CA","opp":"LIKE","condition":"or","searchLevel":0,"valueDescription":"USD"},{"name":"Name","value":"USA","type":"string","seq":2,"tableName":"CA","opp":"LIKE","condition":"and","searchLevel":0,"valueDescription":"USA"}]}, fileName="US ")
     util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="USD Revenue GL", onlyValue=True)
     download_JTD_Billing(pkey, option_name)
 
-    print("--------------------------------------")
+    print("--------------------------------------\n")
     print("Step 4: Generate 4 5 Budget %Complete.xlsx")
-    generate_new_file(TEMPLETE2)
     download_contract(pkey, option_name)
 
-    print("--------------------------------------")
+    print("--------------------------------------\n")
     print("Step 5: Generate 6 New Model_Earned Revenue Accrual.xlsx")
-    generate_new_file(TEMPLETE3)
-    download_project_list()
-    download_vp_revgen()
-    final_step()    
-
+    
+    final_step() 
+    
 if __name__ == '__main__':
     main()
