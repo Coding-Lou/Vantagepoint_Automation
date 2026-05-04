@@ -1,324 +1,105 @@
-"""
-Adapter for AR (Accounts Receivable) task.
-"""
 from typing import Dict, Any, Optional
 from pathlib import Path
-import json
-import time
 
 from domain.adapters.base_adapter import BaseAdapter
 import core.ar as ar_module
 import tools.util as util_module
 import tools.config_manager as config_manager
 
-#region agent log
-DEBUG_LOG_PATH = Path(r"c:\cursor\.cursor\debug.log")
-
-def _agent_log(
-    hypothesis_id: str,
-    location: str,
-    message: str,
-    data: Optional[Dict[str, Any]] = None,
-    run_id: str = "pre-fix",
-) -> None:
-    payload = {
-        "sessionId": "debug-session",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data or {},
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DEBUG_LOG_PATH.open("a", encoding="utf-8") as log_file:
-            log_file.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-#endregion
-
 
 class ARAdapter(BaseAdapter):
-    """
-    Adapter for AR statement generation task.
-    
-    Wraps the original ar.py script logic without modifying it.
-    """
-    
+
     def execute(
         self,
         statement_date: str,
         mail_from: Optional[str] = None,
         mail_cc: Optional[str] = None,
         mail_subject: Optional[str] = None,
-        mail_body: Optional[str] = None
+        mail_body: Optional[str] = None,
     ) -> Dict[str, Any]:
-        #region agent log
-        _agent_log(
-            "H1",
-            "ARAdapter.execute",
-            "ARAdapter.execute entry",
-            {
-                "has_statement_date": bool(statement_date),
-                "statement_date": statement_date,
-                "has_mail_from": bool(mail_from),
-                "has_mail_cc": bool(mail_cc),
-                "has_mail_subject": bool(mail_subject),
-                "has_mail_body": bool(mail_body),
-            },
-        )
-        #endregion
-        """
-        Execute AR statement generation task.
-        
-        Args:
-            statement_date: Statement date in YYYY-MM-DD format
-            mail_from: Email sender address
-            mail_cc: Email CC addresses
-            mail_subject: Email subject
-            mail_body: Email body (HTML)
-            
-        Returns:
-            Result dictionary with success status and output file path
-        """
         try:
-            #region agent log
-            _agent_log(
-                "H1",
-                "ARAdapter.execute",
-                "AR adapter execute called",
-                {
-                    "has_date": bool(statement_date),
-                },
-            )
-            #endregion
-            # Save original config values for restoration (only if we need to update)
-            original_from = None
-            original_cc = None
-            original_subject = None
-            original_body = None
-            
+            overrides = self._apply_config_overrides(mail_from, mail_cc, mail_subject, mail_body)
             try:
-                #region agent log
-                _agent_log(
-                    "H1",
-                    "ARAdapter.execute",
-                    "Before config update",
-                    {
-                        "has_mail_from": bool(mail_from),
-                        "has_mail_cc": bool(mail_cc),
-                        "has_mail_subject": bool(mail_subject),
-                        "has_mail_body": bool(mail_body),
-                    },
-                )
-                #endregion
-                # Update config only if provided and different from current config
-                # This avoids unnecessary config updates and errors
-                if mail_from:
-                    #region agent log
-                    _agent_log("H2", "ARAdapter.execute", "Getting original FROM", {})
-                    #endregion
-                    original_from = util_module.get_config(["AR", "FROM"])
-                    #region agent log
-                    _agent_log(
-                        "H2",
-                        "ARAdapter.execute",
-                        "Got original FROM",
-                        {"original_from": str(original_from)[:50] if original_from else None, "mail_from": str(mail_from)[:50]},
-                    )
-                    #endregion
-                    if mail_from != original_from:
-                        #region agent log
-                        _agent_log("H2", "ARAdapter.execute", "Updating FROM config", {})
-                        #endregion
-                        config_manager.update_config_value(["AR", "FROM"], mail_from)
-                if mail_cc:
-                    #region agent log
-                    _agent_log("H3", "ARAdapter.execute", "Getting original CC", {})
-                    #endregion
-                    original_cc = util_module.get_config(["AR", "CC"])
-                    #region agent log
-                    _agent_log(
-                        "H3",
-                        "ARAdapter.execute",
-                        "Got original CC",
-                        {"original_cc": str(original_cc)[:50] if original_cc else None, "mail_cc": str(mail_cc)[:50]},
-                    )
-                    #endregion
-                    if mail_cc != original_cc:
-                        #region agent log
-                        _agent_log("H3", "ARAdapter.execute", "Updating CC config", {})
-                        #endregion
-                        config_manager.update_config_value(["AR", "CC"], mail_cc)
-                if mail_subject:
-                    #region agent log
-                    _agent_log("H4", "ARAdapter.execute", "Getting original SUBJECT", {})
-                    #endregion
-                    original_subject = util_module.get_config(["AR", "SUBJECT"])
-                    #region agent log
-                    _agent_log(
-                        "H4",
-                        "ARAdapter.execute",
-                        "Got original SUBJECT",
-                        {"original_subject": str(original_subject)[:50] if original_subject else None, "mail_subject": str(mail_subject)[:50]},
-                    )
-                    #endregion
-                    if mail_subject != original_subject:
-                        #region agent log
-                        _agent_log("H4", "ARAdapter.execute", "Updating SUBJECT config", {})
-                        #endregion
-                        config_manager.update_config_value(["AR", "SUBJECT"], mail_subject)
-                if mail_body:
-                    #region agent log
-                    _agent_log("H5", "ARAdapter.execute", "Getting original BODY", {})
-                    #endregion
-                    original_body = util_module.get_config(["AR", "BODY"])
-                    #region agent log
-                    _agent_log(
-                        "H5",
-                        "ARAdapter.execute",
-                        "Got original BODY",
-                        {"original_body_len": len(str(original_body)) if original_body else 0, "mail_body_len": len(str(mail_body))},
-                    )
-                    #endregion
-                    if mail_body != original_body:
-                        #region agent log
-                        _agent_log("H5", "ARAdapter.execute", "Updating BODY config", {})
-                        #endregion
-                        config_manager.update_config_value(["AR", "BODY"], mail_body)
-                #region agent log
-                _agent_log("H1", "ARAdapter.execute", "After config update", {})
-                #endregion
-                
-                # Log start
-                if self.log_callback:
-                    self.log_callback("INFO", f"Starting AR statement generation for date: {statement_date}")
-                
-                # CRITICAL: Update HEADERS in ar_module to ensure fresh authentication
-                # ar.py initializes HEADERS at module load time, which may be stale
-                # We need to refresh it before execution to use current login credentials
-                ar_module.HEADERS = util_module.set_headers()
-                if self.log_callback:
-                    self.log_callback("INFO", "Updated authentication headers")
-                
-                # Ensure ar_export folder exists
-                import os
-                ar_export_dir = "ar_export"
-                if not os.path.exists(ar_export_dir):
-                    os.makedirs(ar_export_dir, exist_ok=True)
-                    if self.log_callback:
-                        self.log_callback("INFO", f"Created directory: {ar_export_dir}")
-                
-                # Initialize AR module with statement date
-                self._set_statement_date(statement_date)
-                if self.log_callback:
-                    self.log_callback("INFO", f"Set statement date to: {statement_date}")
-                
-                # Initialize output
-                ar_module.init_output()
-                if self.log_callback:
-                    self.log_callback("INFO", "Initialized output workbook")
-                
-                # Download CSV
-                if self.log_callback:
-                    self.log_callback("INFO", "Downloading AR statement CSV...")
-                ar_module.ar_download_csv()
-                
-                # Process statements
-                if self.log_callback:
-                    self.log_callback("INFO", "Processing AR statements...")
-                
-                # Refresh HEADERS again before processing (in case processing takes long time)
-                ar_module.HEADERS = util_module.set_headers()
-                
-                zip_client_names = ar_module.ar_process()
-                
-                if self.log_callback:
-                    self.log_callback("INFO", f"Processed statements. Records: {ar_module.RECORDS}")
-                
-                # Process zip files for clients that need them
-                if zip_client_names:
-                    if self.log_callback:
-                        self.log_callback("INFO", f"Creating zip files for {len(zip_client_names)} clients...")
-                    for client_name in zip_client_names:
-                        try:
-                            client_id = util_module.get_clientID(client_name)
-                            ar_module.ar_zipfile(client_id, client_name)
-                            if self.log_callback:
-                                self.log_callback("INFO", f"Created zip file for {client_name}")
-                        except Exception as e:
-                            if self.log_callback:
-                                self.log_callback("ERROR", f"Failed to create zip for {client_name}: {str(e)}")
-                
-                # Save Excel
-                if self.log_callback:
-                    self.log_callback("INFO", "Saving Excel file...")
-                excel_file = util_module.save_excel(ar_module.wb, ar_module.RECORDS)
-                if self.log_callback:
-                    self.log_callback("SUCCESS", f"Excel file saved: {excel_file}")
-                
-                return {
-                    "success": True,
-                    "output_file": excel_file,
-                    "records_count": ar_module.RECORDS,
-                    "message": f"AR task completed. {ar_module.RECORDS} records processed."
-                }
-                
+                return self._run(statement_date)
             finally:
-                # Restore original config only if we updated it
-                if original_from is not None:
-                    config_manager.update_config_value(["AR", "FROM"], original_from)
-                if original_cc is not None:
-                    config_manager.update_config_value(["AR", "CC"], original_cc)
-                if original_subject is not None:
-                    config_manager.update_config_value(["AR", "SUBJECT"], original_subject)
-                if original_body is not None:
-                    config_manager.update_config_value(["AR", "BODY"], original_body)
-                
+                self._restore_config(overrides)
         except Exception as e:
-            #region agent log
-            import traceback
-            _agent_log(
-                "H1",
-                "ARAdapter.execute",
-                "AR adapter raised exception",
-                {
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "traceback": traceback.format_exc()[:500],
-                },
-            )
-            #endregion
-            if self.log_callback:
-                self.log_callback("ERROR", f"AR task failed: {str(e)}")
-            return {
-                "success": False,
-                "message": f"AR task failed: {str(e)}"
-            }
-    
-    def _set_statement_date(self, date: str) -> None:
-        """
-        Set statement date in ar module.
-        
-        This sets the STATEMENTDATE global variable and initializes AR module.
-        
-        Args:
-            date: Date string in YYYY-MM-DD format
-        """
-        # Set the global STATEMENTDATE variable
-        ar_module.STATEMENTDATE = date
-        
-        # Initialize AR module (check folder, clear folder, set user settings)
-        # We need to replicate ar_init() logic but without input()
-        util_module.check_folder("ar_export")
-        util_module.clear_folder("ar_export")
-        
-        # User Setting
-        import requests
-        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/UserSettings"
-        payload = {"FW_SEUserOptions":[{"OptionName":"arReviewPaidStatus","OptionValue":"Unpaid","_transType":"U"}]}
-        requests.post(url, headers=ar_module.HEADERS, json=payload)
-        
-        if self.log_callback:
-            self.log_callback("INFO", "AR module initialized with statement date")
+            self._log("ERROR", f"AR task failed: {e}")
+            return {"success": False, "message": f"AR task failed: {e}"}
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _run(self, statement_date: str) -> Dict[str, Any]:
+        self._log("INFO", f"Starting AR statement generation for date: {statement_date}")
+
+        ar_module.HEADERS     = util_module.set_headers()
+        ar_module.MAIL_FROM   = util_module.get_config(["AR", "FROM"])
+        ar_module.CC          = util_module.get_config(["AR", "CC"])
+        ar_module.SUBJECT     = util_module.get_config(["AR", "SUBJECT"])
+        ar_module.BODY        = util_module.get_config(["AR", "BODY"])
+        ar_module.OPTIONALMSG = util_module.get_config(["AR", "OPTIONALMSG"])
+        ar_module.EXCLUDE     = util_module.get_config(["AR", "EXCLUDE"])
+
+        ar_module.ar_init_with_date(statement_date)
+        ar_module.init_output()
+
+        self._log("INFO", "Downloading AR statement CSV...")
+        ar_module.ar_download_csv()
+
+        self._log("INFO", "Processing AR statements...")
+        ar_module.HEADERS = util_module.set_headers()
+        zip_client_names = ar_module.ar_process()
+        self._log("INFO", f"Processed {ar_module.RECORDS} records")
+
+        if zip_client_names:
+            self._log("INFO", f"Creating zip files for {len(zip_client_names)} clients...")
+            for client_name in zip_client_names:
+                try:
+                    client_id = util_module.get_clientID(client_name)
+                    ar_module.ar_zipfile(client_id, client_name)
+                except Exception as e:
+                    self._log("ERROR", f"Failed to create zip for {client_name}: {e}")
+
+        self._log("INFO", "Saving Excel file...")
+        excel_file = util_module.save_excel(
+            ar_module.wb,
+            ar_module.RECORDS,
+            folder_path=str(Path(ar_module.ONEDRIVEDIR) / ar_module.WORKDIR),
+        )
+        self._log("SUCCESS", f"Saved: {excel_file}")
+
+        return {
+            "success": True,
+            "output_file": excel_file,
+            "records_count": ar_module.RECORDS,
+            "message": f"AR task completed. {ar_module.RECORDS} records processed.",
+        }
+
+    def _apply_config_overrides(
+        self,
+        mail_from: Optional[str],
+        mail_cc: Optional[str],
+        mail_subject: Optional[str],
+        mail_body: Optional[str],
+    ) -> Dict[str, Any]:
+        fields = {
+            ("AR", "FROM"): mail_from,
+            ("AR", "CC"): mail_cc,
+            ("AR", "SUBJECT"): mail_subject,
+            ("AR", "BODY"): mail_body,
+        }
+        originals: Dict[str, Any] = {}
+        for keys, value in fields.items():
+            if value is None:
+                continue
+            current = util_module.get_config(list(keys))
+            if value != current:
+                originals[keys] = current
+                config_manager.update_config_value(list(keys), value)
+        return originals
+
+    def _restore_config(self, originals: Dict[str, Any]) -> None:
+        for keys, value in originals.items():
+            config_manager.update_config_value(list(keys), value)

@@ -62,7 +62,7 @@ class ReportExportAdapter(BaseAdapter):
         Execute the selected Rev-Gen report downloads.
 
         Args:
-            start_period: Period string e.g. "202601" (used for GL range)
+            start_period: Period string e.g. "202601" (user-selected start period)
             end_period:   Period string e.g. "202607" (primary period)
             pkey:         PKey of the saved search option
             option_name:  Display name of the saved search option
@@ -118,8 +118,8 @@ class ReportExportAdapter(BaseAdapter):
                 self._log("SUCCESS", "Cost From System downloaded.")
 
             if download_billing:
-                self._log("INFO", "Downloading Billing/Spent/WO/Prop...")
-                re_module.download_JTD_Billing(base_folder, pkey, option_name)
+                self._log("INFO", "Downloading US General Ledger/Billing/Spent/WO/Prop...")
+                re_module.download_JTD_Billing(base_folder, pkey, option_name, end_period)
                 self._log("SUCCESS", "Billing/Spent/WO/Prop downloaded.")
 
             if download_billed:
@@ -131,11 +131,16 @@ class ReportExportAdapter(BaseAdapter):
             re_module.final_step(base_folder)
             self._log("SUCCESS", "Files moved to revenue_accrual folder.")
 
+            import subprocess
+            folder_path = os.path.join(os.getcwd(), "revenue model report export")
+            subprocess.Popen(["explorer", folder_path])
+
             return {
                 "success": True,
                 "message": f"All selected reports exported to {base_folder}",
             }
-
+        
+            
         except Exception as e:
             self._log("ERROR", f"Report export failed: {str(e)}")
             return {"success": False, "message": f"Report export failed: {str(e)}"}

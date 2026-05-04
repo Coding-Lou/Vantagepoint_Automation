@@ -7,6 +7,7 @@ Supports both CLI mode (with command-line arguments) and UI mode (without argume
 
 All update checking logic has been removed for simplified startup.
 """
+from getpass import getpass
 import sys
 import json
 import time
@@ -387,3 +388,4 @@ if __name__ == "__main__":
         # Only print completion message for CLI mode
         pass
     sys.exit(exit_code)
+

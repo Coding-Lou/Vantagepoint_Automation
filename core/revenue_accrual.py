@@ -13,6 +13,8 @@ import random
 import string
 import hashlib
 import shutil
+import stat
+import subprocess
 import pythoncom
 import time
 import getpass
@@ -23,14 +25,81 @@ TEMPLETE2 = "4 5 Budget _Complete.xlsx"
 TEMPLETE3 = "6 New Model_Earned Revenue Accrual.xlsx"
 
 
+
+def search_options(project_list):
+    name = f"Rev_{datetime.now().strftime('%Y-%m-%d_%H_%M')}"
+    pkey =  hashlib.md5(name.encode('utf-8')).hexdigest()
+    try:
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/"
+        
+        savedOptionsDetail = []
+        for projectNum in project_list:
+            savedOptionsDetail.append({"Seq":1,"ParentKey":pkey,"OptionName":"WBS1","Type":"wbs1","Operator":"=","Value":projectNum,"ValueDescription":"","ReportOption":"N","Condition":"and","TableName":"PR","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":1,"PKey":"","_originalValues":{},"_transType":"I"})
+        
+        savedOptionsDetail.append({"Seq":-100,"ParentKey":pkey,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"[CREATOR_USERNAME]","ValueDescription":"Myself","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":None,"SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"})
+  
+        payload = {"Name":name,"Type":"wbs1","Private":"Y","Folder":"","LinkedPKey":"","WhereClauseSearch":"N","ResultsToDisplay":"","ListViewDisplay":"","SavedOptionsDetail":savedOptionsDetail, "PKey":pkey,"Username":""}
+        response = requests.post(url, headers=HEADERS, json=payload)
+
+        return pkey, name
+
+    except Exception as e:
+        print(f"Error in save search_options: {e}")
+
+def download_serch_options_list(pkey):
+    base_folder = Path.home() / "Downloads"
+
+    url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/{pkey}"
+    response = requests.get(url, headers=HEADERS)
+    option_name = response.json()[0]["Name"]
+
+    url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/project/?lookuptype=wbs1&searchType=ALL&pagesize=1000&offset=0&page=1&isLevelLock=false&order=name&applicationId=&excludeSelectedResultIdsOption=true&savedSearchPKey={pkey}&timeout=Project_Search&WBSType=WBS1&AccessGroupBy=WBS1"
+    data = requests.get(url, headers=HEADERS).json()
+
+    csvName = os.path.join(base_folder, f"search_option_{option_name}.csv")
+    
+    with open(csvName, 'w', encoding='utf-8', newline='') as f_out:
+        writer = csv.writer(f_out)
+        writer.writerow(["Q-Number", "ProjectName"])
+        for item in data:
+            projectNum = item["key"]
+            projectName = item["Name"]
+            writer.writerow([projectNum, projectName])
+
+    print(f"✅ Search option result downloaded: {csvName}")
+
+def get_search_list():
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/?order=name&type=wbs1&excludeCrossHubSearch=false&searchType=ALL&WBSType=WBS1&AccessGroupBy=WBS1&isLevelLock=false"
+    data = requests.get(url, headers=HEADERS).json()
+    search_list = []
+    for item in data:
+        if item["Name"].startswith("Rev_"):
+            search_list.append({
+                "PKey": item["PKey"],
+                "Name": item["Name"]
+            })
+    search_list.sort(key=lambda x: x["Name"])
+    print("Search List:", [f"{item['PKey']}: {item['Name']}" for item in search_list])
+    return search_list
+
+
+def get_search_option_project_total(pkey):
+    url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/project/?count&searchType=ALL&WBSType=WBS1&AccessGroupBy=WBS1&isLevelLock=false&filter=&page=1&pagesize=20&order=name&applicationId=&savedSearchPKey={pkey}"
+    data = requests.get(url, headers=HEADERS).json()[0]["_ResultCount"]
+    return data
+
+
+
 def update_template():
     username = getpass.getuser()  # safer than os.getlogin()
 
-    source_path = Path(
-        f"C:/Users/{username}/OneDrive - QCA Systems Ltd/"
-        "QCA Accounting Dept - Documents/03 Accounting/"
-        "400 Process Improvement/Automation/templete/Rev-Gen Step1"
-    )
+    onedrive_root = util.get_onedrive_path()
+
+    if onedrive_root:
+        source_path = onedrive_root / "QCA Accounting Dept - Documents/03 Accounting/400 Process Improvement/Automation/template/Rev-Gen"
+        print(f"Success get the OneDrive path: {onedrive_root}")
+    else:
+        print("OneDrive path not found. Please ensure OneDrive is installed and configured correctly.")
 
     save_path = Path("C:/temp/revenue_accrual")
 
@@ -42,14 +111,21 @@ def update_template():
     # Remove destination if it exists
     if save_path.exists():
         try:
-            shutil.rmtree(save_path)
+            def _remove_readonly(func, path, _):
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            shutil.rmtree(save_path, onerror=_remove_readonly)
             print(f"💥 Cleared directory: {save_path}")
-        except PermissionError:
-            print(f"❌ Permission denied: {save_path} (file may be open)")
-            return
-        except Exception as e:
-            print(f"❌ Cleanup error: {e}")
-            return
+        except Exception:
+            try:
+                subprocess.run(
+                    ["cmd", "/c", "rd", "/s", "/q", str(save_path)],
+                    check=True,
+                )
+                print(f"💥 Force deleted directory: {save_path}")
+            except Exception as e:
+                print(f"❌ Cleanup error: {e}")
+                return
 
     # Copy fresh
     try:
@@ -756,20 +832,20 @@ def final_step():
     try:
         target_wb = excel.Workbooks.Open(os.path.abspath(targetFile))
         
-        inputFile1 = os.path.join(target_dir, "0 JTD Billed Invoice Summary.xlsx")
+        inputFile1 = os.path.join(target_dir, TEMPLETE0)
         util.excel_full_copy(inputFile=inputFile1, inputSheet="2_Billed", 
                              targetFile=targetFile, targetSheet="2_Billed", 
                              onlyValue=True, targetCell='A2', refreshAll=False,
                              excel_instance=excel, target_wb_instance=target_wb) 
 
-        inputFile2 = os.path.join(target_dir, "1 2 3 JTD Billing.xlsx")
+        inputFile2 = os.path.join(target_dir, TEMPLETE1)
         for sheet in ["Billing", "Spent", "WO", "Prop"]:
             util.excel_full_copy(inputFile=inputFile2, inputSheet=sheet, 
                                  targetFile=targetFile, targetSheet=sheet, 
                                  onlyValue=True, targetCell='B2', refreshAll=False,
                                  excel_instance=excel, target_wb_instance=target_wb)
 
-        inputFile3 = os.path.join(target_dir, "4 5 Budget %Complete.xlsx")
+        inputFile3 = os.path.join(target_dir, TEMPLETE2)
         util.excel_full_copy(inputFile=inputFile3, inputSheet="Budget", 
                              targetFile=targetFile, targetSheet="Budget", 
                              onlyValue=True, targetCell='I2', refreshAll=False,

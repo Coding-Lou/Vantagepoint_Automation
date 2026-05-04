@@ -88,7 +88,7 @@ class _DownloadSearchListWorker(QThread):
         try:
             re_module.HEADERS = util_module.set_headers()
             _BASE_FOLDER.mkdir(parents=True, exist_ok=True)
-            re_module.download_serch_options_list(self.base_folder, self.pkey)
+            re_module.download_serch_options_list(self.pkey)
             self.done.emit("success")
         except Exception as e:
             self.done.emit(f"error:{e}")
@@ -121,7 +121,7 @@ class _GenerateSearchOptionWorker(QThread):
                 return _orig_gl(base_folder, *args, **kwargs)
             re_module.download_GL = _patched_gl
             try:
-                pkey, option_name = re_module.create_new_search_option(self.end_period)
+                pkey, option_name = re_module.create_new_search_option(self.base_folder, self.end_period)
             finally:
                 re_module.download_GL = _orig_gl
             self.done.emit(pkey, option_name)
@@ -172,8 +172,6 @@ _CHECKBOX_STYLE = """
 """
 
 _SECTION_LABEL_STYLE = "font-weight: 600; font-size: 13px;"
-_ROW_LABEL_STYLE     = "font-size: 12px;"
-_MUTED_VALUE_STYLE   = "font-size: 12px; padding: 6px 0;"
 
 
 # ──────────────────────────────────────────────────────────────
@@ -213,7 +211,7 @@ class ReportExportTaskPage(BaseTaskPage):
 
     def _validate_params(self) -> Tuple[bool, str]:
         if not self._end_period_value():
-            return False, "Please select an End Period."
+            return False, "Please select an accounting period."
         if not any(cb.isChecked() for cb in self._checkboxes()):
             return False, "Please select at least one report to download."
         needs_pkey = (
@@ -231,10 +229,8 @@ class ReportExportTaskPage(BaseTaskPage):
         return True, ""
 
     def _get_params(self) -> Dict[str, Any]:
-        end = self._end_period_value() or ""
         return {
-            "start_period":          self._derive_start(end),
-            "end_period":            end,
+            "end_period":            self._end_period_value() or "",
             "pkey":                  self._selected_pkey() or "",
             "option_name":           self._selected_option_name() or "",
             "download_project_list": self.cb_project_list.isChecked(),
@@ -253,7 +249,7 @@ class ReportExportTaskPage(BaseTaskPage):
 
     def _build_sop(self) -> None:
         body = BodyLabel(
-            "1. Select an End Period — Start Period is set automatically to the first period of that year.\n"
+            "1. Select Start and End Periods using the year/month selectors.\n"
             "2. Select a Project Scope. Click Download List to verify, or Generate to create a new one.\n"
             "3. Check the reports to export, then click Execute."
         )
@@ -268,33 +264,12 @@ class ReportExportTaskPage(BaseTaskPage):
         header.setStyleSheet(_SECTION_LABEL_STYLE)
         self.config_layout.addWidget(header)
 
-        form = QGridLayout()
-        form.setSpacing(8)
-        form.setColumnMinimumWidth(0, 100)
-        form.setColumnStretch(1, 0)
-        form.setColumnStretch(2, 1)
+        self.period_combo = ComboBox()
+        self.period_combo.setStyleSheet(_combo_style())
+        self.period_combo.setMinimumWidth(300)
+        self.period_combo.currentIndexChanged.connect(self._on_end_period_changed)
+        self.config_layout.addWidget(self.period_combo)
 
-        # Row 0 — Start Period (auto-derived, read-only)
-        start_lbl = BodyLabel("Start Period")
-        start_lbl.setStyleSheet(_ROW_LABEL_STYLE)
-        self.start_period_label = BodyLabel("—")
-        self.start_period_label.setStyleSheet(
-            f"{_MUTED_VALUE_STYLE} color: {ThemeColors.text_muted()};"
-        )
-        form.addWidget(start_lbl,            0, 0, Qt.AlignmentFlag.AlignVCenter)
-        form.addWidget(self.start_period_label, 0, 1, Qt.AlignmentFlag.AlignVCenter)
-
-        # Row 1 — End Period (dropdown)
-        end_lbl = BodyLabel("End Period")
-        end_lbl.setStyleSheet(_ROW_LABEL_STYLE)
-        self.end_period_combo = ComboBox()
-        self.end_period_combo.setStyleSheet(_combo_style())
-        self.end_period_combo.setMinimumWidth(300)
-        self.end_period_combo.currentIndexChanged.connect(self._on_end_period_changed)
-        form.addWidget(end_lbl,              1, 0, Qt.AlignmentFlag.AlignVCenter)
-        form.addWidget(self.end_period_combo, 1, 1, Qt.AlignmentFlag.AlignVCenter)
-
-        self.config_layout.addLayout(form)
         self._load_periods()
 
     # ── Block 3: Project Scope ─────────────────────────────────
@@ -361,13 +336,13 @@ class ReportExportTaskPage(BaseTaskPage):
         header.setStyleSheet(_SECTION_LABEL_STYLE)
         self.config_layout.addWidget(header)
 
-        self.cb_project_list     = QCheckBox("Project List")
-        self.cb_estimate         = QCheckBox("Estimate")
-        self.cb_contract         = QCheckBox("Contract")
-        self.cb_billed           = QCheckBox("Billed")
-        self.cb_cost_gl          = QCheckBox("Cost GL")
-        self.cb_cost_from_system = QCheckBox("Cost From System")
-        self.cb_billing          = QCheckBox("Billing / Spent / WO / Prop")
+        self.cb_project_list     = QCheckBox("Project List JTD")
+        self.cb_estimate         = QCheckBox("Estimate JTD")
+        self.cb_contract         = QCheckBox("Contract JTD")
+        self.cb_billed           = QCheckBox("Billed JTD")
+        self.cb_cost_gl          = QCheckBox("Cost GL JTD")
+        self.cb_cost_from_system = QCheckBox("Cost From System JTD")
+        self.cb_billing          = QCheckBox("Billing / Spent / WO / Prop JTD")
 
         for cb in self._checkboxes():
             cb.setChecked(False)
@@ -396,14 +371,14 @@ class ReportExportTaskPage(BaseTaskPage):
     # ── Period helpers ─────────────────────────────────────────
 
     def _load_periods(self) -> None:
-        if not hasattr(self, "end_period_combo"):
+        if not hasattr(self, "period_combo"):
             return
         try:
             ps_module.HEADERS = util_module.set_headers()
             period_data = ps_module.print_period()
 
-            self.end_period_combo.blockSignals(True)
-            self.end_period_combo.clear()
+            self.period_combo.blockSignals(True)
+            self.period_combo.clear()
             self.period_data_map.clear()
 
             for p in period_data:
@@ -413,29 +388,25 @@ class ReportExportTaskPage(BaseTaskPage):
                     f"To: {p['AccountPdEnd'][:10]}"
                 )
                 self.period_data_map[display] = str(p["Period"])
-                self.end_period_combo.addItem(display)
+                self.period_combo.addItem(display)
 
-            self.end_period_combo.blockSignals(False)
+            self.period_combo.blockSignals(False)
 
-            if self.end_period_combo.count() > 0:
-                self.end_period_combo.setCurrentIndex(0)
+            if self.period_combo.count() > 0:
+                self.period_combo.setCurrentIndex(0)
                 self._on_end_period_changed(0)
+
         except Exception as e:
-            self.end_period_combo.blockSignals(False)
-            self.end_period_combo.clear()
-            self.end_period_combo.addItem("Error loading periods — please check connection")
+            self.period_combo.blockSignals(False)
+            self.period_combo.clear()
+            self.period_combo.addItem("Error loading periods — please check connection")
             print(f"Error loading periods: {e}")
 
     def _end_period_value(self) -> Optional[str]:
-        text = self.end_period_combo.currentText()
+        text = self.period_combo.currentText()
         if not text or text.startswith("Error loading"):
             return None
         return self.period_data_map.get(text)
-
-    @staticmethod
-    def _derive_start(end_period: str) -> str:
-        """202611 → 202601"""
-        return end_period[:4] + "01" if end_period else ""
 
     # ── Search option helpers ──────────────────────────────────
 
@@ -454,7 +425,9 @@ class ReportExportTaskPage(BaseTaskPage):
             self.search_option_combo.blockSignals(False)
 
             if self.search_option_combo.count() > 0:
+                self.search_option_combo.blockSignals(True)
                 self.search_option_combo.setCurrentIndex(0)
+                self.search_option_combo.blockSignals(False)
                 self._on_search_option_changed(0)
         except Exception as e:
             print(f"Error loading search options: {e}")
@@ -489,9 +462,6 @@ class ReportExportTaskPage(BaseTaskPage):
         # Auto-generate scope when "Add New" is selected
         if self._selected_pkey() is None:
             end = self._end_period_value()
-            if not end:
-                self._append_log("WARNING", "Please select an End Period first.")
-                return
             if self._gen_worker and self._gen_worker.isRunning():
                 return
             self.execute_btn.setEnabled(False)
@@ -568,9 +538,8 @@ class ReportExportTaskPage(BaseTaskPage):
     # ── Slots ──────────────────────────────────────────────────
 
     @Slot(int)
-    def _on_end_period_changed(self, _index: int) -> None:
+    def _on_end_period_changed(self, _: int) -> None:
         end = self._end_period_value()
-        self.start_period_label.setText(self._derive_start(end) if end else "—")
         if not end:
             return
         if self._change_period_worker and self._change_period_worker.isRunning():
@@ -633,7 +602,8 @@ class ReportExportTaskPage(BaseTaskPage):
     def _on_download_search_list_done(self, result: str) -> None:
         self.dl_list_btn.setEnabled(True)
         if result == "success":
-            self._append_log("SUCCESS", f"Project list downloaded to {_BASE_FOLDER}")
+            from pathlib import Path
+            self._append_log("SUCCESS", f"Project list downloaded to {Path.home() / 'Downloads'}")
         else:
             self._append_log("ERROR", f"Download failed: {result.removeprefix('error:')}")
 

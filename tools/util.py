@@ -16,6 +16,7 @@ import glob
 import sys
 import win32com.client
 import pythoncom
+import winreg
 
 # Shared lock — prevents concurrent reads from seeing a half-written config file.
 # config_manager.py imports this same lock so all config I/O is serialized.
@@ -352,28 +353,44 @@ def set_headers():
     #endregion
     return headers
 
+
 def init_workdir():
-    current_path = os.getcwd()
-    pattern = os.path.join(".", "job*.xlsx")
-
-    for file_path in glob.glob(pattern):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            print(f"Failed to delete {file_path}: {e}")
+    # 1. Locate OneDrive Root
+    onedrive_root_str = os.getenv("OneDriveCommercial") or os.getenv("OneDrive")
     
-    before, _, after = current_path.partition("OneDrive - QCA Systems Ltd")
-    if not after:
-        print(f'⚠️ OneDrive - QCA Systems Ltd not found in current path: {current_path}, the power automate can not been used.')
-        print()
-        set_config("ONEDRIVEDIR", str(current_path))
-        return
+    if not onedrive_root_str:
+        # Fallback to manual check if environment variables are missing
+        current_path = Path.cwd()
+        target_name = "OneDrive - QCA Systems Ltd"
+        if target_name in current_path.parts:
+            idx = current_path.parts.index(target_name)
+            onedrive_root = Path(*current_path.parts[:idx + 1])
+        else:
+            print("❌ OneDrive not found.")
+            return
+    else:
+        onedrive_root = Path(onedrive_root_str)
 
-    ONEDRIVEDIR = before + "OneDrive - QCA Systems Ltd"
-    WORKDIR =  after.lstrip("\\")
+    # 2. Build the path to the 'automation' folder inside 'Documents'
+    # Pathlib automatically handles the slashes for your OS
+    automation_path = onedrive_root / "Documents" / "automation"
 
-    set_config("ONEDRIVEDIR", ONEDRIVEDIR)
-    set_config("WORKDIR", WORKDIR)
+    try:
+        # 3. Create the folder if it doesn't exist
+        # parents=True ensures 'Documents' is created if it's somehow missing
+        automation_path.mkdir(parents=True, exist_ok=True)
+        
+        # 4. Set configurations
+        # relative_to() provides the string "Documents/automation"
+        work_dir_relative = automation_path.relative_to(onedrive_root)
+        
+        set_config("ONEDRIVEDIR", str(onedrive_root))
+        set_config("WORKDIR", str(work_dir_relative))
+        
+        print(f"✅ Target Workspace: {automation_path}")
+        
+    except Exception as e:
+        print(f"❌ Could not create directory: {e}")
 
 
 def assamble_projects(projects):
@@ -441,7 +458,7 @@ def get_clientID(clientName):
     except Exception as e:
         print("❌ Error in function get_clientID() with input: " + clientName)
 
-def save_excel(wb, records):
+def save_excel(wb, records, folder_path=None):
     try:
         ws = wb.active
         table_range = f"A1:I{records}"
@@ -450,12 +467,14 @@ def save_excel(wb, records):
         tab = Table(displayName = "Table1", ref = table_range)
         ws.add_table(tab)
         timestamp = datetime.now().strftime("%Y%m%d")
-        excelName = os.path.join( f"Job_{timestamp}.xlsx")
+        if folder_path is None:
+            folder_path = os.path.join(get_config(["ONEDRIVEDIR"]), get_config(["WORKDIR"]))
+        excelName = os.path.join(folder_path, f"Job_{timestamp}.xlsx")
         wb.save(excelName)
 
         return excelName
     except Exception as e:
-        print("❌Error in function save_excel()")
+        print(f"❌ Error in function save_excel(): {e}")
 
 def download_with_progress(url, save_path, latest_version):
     import requests
@@ -583,8 +602,8 @@ def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue,
 
     CALLEE_BUSY     = -2147418111
     SERVER_DISC     = -2147220995
-    MAX_RETRIES     = 15          # bumped up slightly for busy spikes
-    RETRY_SLEEP     = 2
+    MAX_RETRIES     = 20
+    RETRY_SLEEP     = 3
 
     def robust_call(func, *args, **kwargs):
         for attempt in range(MAX_RETRIES):
@@ -613,35 +632,36 @@ def excel_full_copy(inputFile, inputSheet, targetFile, targetSheet, onlyValue,
     wb_target = None
 
     try:
-        wb_input  = robust_call(excel.Workbooks.Open, inputFile)
-        ws_input  = (wb_input.Worksheets(1)
-                     if inputFile.lower().endswith(".csv")
-                     else wb_input.Worksheets(inputSheet))
+        wb_input = robust_call(excel.Workbooks.Open, inputFile)
+        if inputFile.lower().endswith(".csv"):
+            ws_input = robust_call(lambda: wb_input.Worksheets(1))
+        else:
+            ws_input = robust_call(lambda: wb_input.Worksheets(inputSheet))
 
         wb_target = (target_wb_instance
                      or robust_call(excel.Workbooks.Open, os.path.abspath(targetFile)))
 
-        _ = wb_target.Name   # sanity-check the COM object is alive
+        robust_call(lambda: wb_target.Name)  # sanity-check the COM object is alive
 
         try:
-            ws_target = wb_target.Worksheets(targetSheet)
+            ws_target = robust_call(lambda: wb_target.Worksheets(targetSheet))
         except Exception:
-            ws_target = wb_target.Worksheets.Add()
-            ws_target.Name = targetSheet
+            ws_target = robust_call(lambda: wb_target.Worksheets.Add())
+            robust_call(lambda: setattr(ws_target, 'Name', targetSheet))
 
-        robust_call(ws_input.UsedRange.Copy)
+        robust_call(lambda: ws_input.UsedRange.Copy())
         print(f"{inputFile} / {inputSheet} copied to {targetFile} / {targetSheet}")
 
         paste_type = -4163 if onlyValue else -4104
-        robust_call(ws_target.Range(targetCell).PasteSpecial, Paste=paste_type)
-        robust_call(setattr, excel, 'CutCopyMode', False)   # ← now retried too
+        robust_call(lambda: ws_target.Range(targetCell).PasteSpecial(Paste=paste_type))
+        robust_call(lambda: setattr(excel, 'CutCopyMode', False))
 
         if refreshAll:
-            robust_call(wb_target.RefreshAll)               # ← now retried too
-            robust_call(excel.CalculateUntilAsyncQueriesDone)
+            robust_call(lambda: wb_target.RefreshAll())
+            robust_call(lambda: excel.CalculateUntilAsyncQueriesDone())
 
         if target_wb_instance is None:
-            robust_call(wb_target.Save)
+            robust_call(lambda: wb_target.Save())
             print(f"✅ Saved: {targetSheet}")
 
     finally:
@@ -750,3 +770,21 @@ def move_and_replace_files(source_dir, target_dir):
                 print(f"❌ Error moving {item.name}: {e}")
 
     print("🏁 All files processed.")
+
+def get_onedrive_path():
+    for key_path in [
+        r"Software\Microsoft\OneDrive\Accounts\Business1",
+        r"Software\Microsoft\OneDrive",
+    ]:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+                path, _ = winreg.QueryValueEx(key, "UserFolder")
+                return Path(path)
+        except FileNotFoundError:
+            continue
+            
+    env_path = os.environ.get("OneDrive") or os.environ.get("OneDriveCommercial")
+    if env_path:
+        return Path(env_path)
+    
+    return None

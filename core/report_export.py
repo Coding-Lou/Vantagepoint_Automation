@@ -24,13 +24,13 @@ TEMPLATE2 = "4 5 Budget _Complete.xlsx"
 TEMPLATE3 = "6 New Model_Earned Revenue Accrual.xlsx"
 
 def download_template(base_folder, file_name):
-    username = getpass.getuser()
+    onedrive_root = util.get_onedrive_path()
 
-    source_path = Path(
-        f"C:/Users/{username}/OneDrive - QCA Systems Ltd/"
-        "QCA Accounting Dept - Documents/03 Accounting/"
-        "400 Process Improvement/Automation/template/Rev-Gen"
-    )
+    if onedrive_root:
+        source_path = onedrive_root / "QCA Accounting Dept - Documents/03 Accounting/400 Process Improvement/Automation/template/Rev-Gen"
+        print(f"Success get the OneDrive path: {onedrive_root}")
+    else:
+        print("OneDrive path not found. Please ensure OneDrive is installed and configured correctly.")
 
     save_path = Path(base_folder)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -469,10 +469,17 @@ def generate_search_option(base_folder, start_period, end_period):
     return pkey, option_name
 
 
-def download_serch_options_list(base_folder, pkey):
+def download_serch_options_list(pkey):
+    base_folder = Path.home() / "Downloads"
+
+    url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/{pkey}"
+    response = requests.get(url, headers=HEADERS)
+    option_name = response.json()[0]["Name"]
+
     url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/project/?lookuptype=wbs1&searchType=ALL&pagesize=1000&offset=0&page=1&isLevelLock=false&order=name&applicationId=&excludeSelectedResultIdsOption=true&savedSearchPKey={pkey}&timeout=Project_Search&WBSType=WBS1&AccessGroupBy=WBS1"
     data = requests.get(url, headers=HEADERS).json()
-    csvName = os.path.join(base_folder, f"search_option_{pkey}.csv")
+
+    csvName = os.path.join(base_folder, f"search_option_{option_name}.csv")
     
     with open(csvName, 'w', encoding='utf-8', newline='') as f_out:
         writer = csv.writer(f_out)
@@ -485,12 +492,12 @@ def download_serch_options_list(base_folder, pkey):
     print(f"✅ Search option result downloaded: {csvName}")
 
 
-def create_new_search_option(period):
+def create_new_search_option(period, base_folder):
     print("--------------------------------------")
     print("Step 1: Generate the project list for the search options")
     download_invoice_YTD()
     print(f"Checking invoice register, now total {len(project_list)} projects touched.")
-    download_GL(startPeriod = '202601', endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
+    download_GL(base_folder=base_folder, startPeriod = '202601', endPeriod = period, needDownload=False, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Account","value":"4","type":"account","seq":1,"tableName":"CA","opp":"startsWith","condition":"or","searchLevel":0,"valueDescription":"4"},{"name":"Account","value":"5","type":"account","seq":2,"tableName":"CA","opp":"startsWith","condition":"and","searchLevel":0,"valueDescription":"5"}]})
     print(f"Checking GL with 4*** and 5***, now total {len(project_list)} projects touched.")
     download_labour_details_YTD()
     print(f"Checking Labour hours, now total {len(project_list)} projects touched.")
@@ -500,6 +507,82 @@ def create_new_search_option(period):
     print(f"unique project number: {len(project_list)}")
     pkey, option_name = search_options(project_list)
     return pkey, option_name
+
+
+def download_total_project_list():
+    try:
+        url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
+        baseRecordSelection = {"pKey":None,"name":"Records Selected","type":"wbs1","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"ChargeType","value":"R","type":"dropdown","seq":1,"tableName":"PR","condition":"and","searchLevel":1,"valueDescription":"Regular"}]}
+        payload = {"reportPath":"/Standard/Project/Project List","reportOptions":{"baseAlternateRowColor":"","baseBottomMargin":0.5,"baseChart3D":"N","baseChartColumn":"","baseChartDivisor":"1","baseChartFontSize":8,"baseChartHeight":3,"baseChartLabelLines":"N","baseChartLabels":"none","baseChartLeft":1,"baseChartLegendPosition":"righttop","baseChartSeriesColumn2":"","baseChartSeriesColumn3":"","baseChartShowPosition":"1","baseChartTitle":"","baseChartTop":0.5,"baseChartType":"none","baseChartWidth":6,"baseChartXTitle":"Project Number","baseChartYTitle":"","baseCulture":"default","baseDefaultCurrencyFormat":"###T###T###D##;(###T###T###D##);#","baseDefaultDateFormat":"M/d/yyyy","baseDefaultHTMLFormatting":"Y","baseDefaultNumberFormat":"###T###T###D##;-###T###T###D##;#","baseFont":"Arial","baseFooterText":"[version] - [options]","baseGridTable":"Activity","baseGroupIndent":0.1,"baseHeadingEndDate":"","baseHeadingRowColor":"","baseHeadingStartDate":"","baseHideDocumentMap":"Y","baseHideSingleLineTotals":"N","baseLeftMargin":0.5,"defaultPage2Top":0,"baseOrientation":"automatic","baseOverrideHeadingDate":"N","basePageHeight":11,"basePageSize":"letter","basePageWidth":8.5,"baseReportName":"Project List","baseRightMargin":0.5,"baseShowBorderLines":"N","baseShowFinalTotals":"N","baseShowTotalsOnHeader":"N","baseStartColumnPosition":0.1,"baseTopMargin":0.5,"baseUnitOfMeasure":"in","baseUseDashpartLayout":"N","baseUseLookupFilterToGrid":"N","ReportGroups":[{"label":"Project Number","sort":"ASC","color":"000080","subTotal":"N","showHeading":"N","pageHeading":"N","collapseExpand":"D","line":"None","pageBreak":"N","groupID":"projectNumber","customGridColumnSort":"","groupWBSLevel":"1"}],"ReportColumns":[{"heading":"Project","width":1.25,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"WBS1","username":"","customGridColumnSort":""},{"heading":"Status","width":0.75,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"StatusDesc","username":"","customGridColumnSort":""},{"heading":"Biller","width":1.5,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"billerName","username":"","customGridColumnSort":""},{"heading":"Name","width":2.2,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"Name","username":"","customGridColumnSort":""},{"heading":"Primary Client","width":1.8,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"ClientName","username":"","customGridColumnSort":""},{"heading":"Project Manager","width":1.5,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"prgName","username":"","customGridColumnSort":""},{"heading":"Principal","width":1.5,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"prinName","username":"","customGridColumnSort":""},{"heading":"Charge Type","width":0.55,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"ChargeType","username":"","customGridColumnSort":""},{"heading":"USD Project","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustUSDProject","username":"","customGridColumnSort":"N"},{"heading":"Large Projects","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustMilestoneBillingProjects400k","username":"","customGridColumnSort":"N"},{"heading":"Materials Only","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustMaterialsOnly","username":"","customGridColumnSort":"N"},{"heading":"Time & Material","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustTimeMaterial","username":"","customGridColumnSort":"N"},{"heading":"Long-term Contract","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustLongtermFixedPrice","username":"","customGridColumnSort":"N"},{"heading":"No Revenue","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustNoRevenue","username":"","customGridColumnSort":"N"},{"heading":"Fixed Fee","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustLumpSumBilling","username":"","customGridColumnSort":"N"},{"heading":"Defined Scope/deliverables","width":0.85,"format":"","align":"left","sectionName":"Section 1","sectionRow":0,"sectionColumn":1,"columnID":"UDCol_CustDefinedScopeValue","username":"","customGridColumnSort":"N"}],"ReportSections":[],"baseRecordSelection":baseRecordSelection,"baseCreateActivity":"N","baseShowDetail":"Y","CurrentWBSActivityActiveWBS1Only":"N","CurrentWBSActivityActiveWBS2Only":"N","CurrentWBSActivityActiveWBS3Only":"N","CurrentWBSActivityActivityRange":"1","CurrentWBSActivityInclInvoiceActivity":"N","CurrentWBSActivityCheckLabor":"Y","CurrentWBSActivityCheckExpense":"Y","_desc_saveOptionRole":["","","","",""],"saveOptionRole":["[CREATOR_USERNAME]","CONTROLLER-RO","ACCOUNTANT","CONTROLLER","ACCOUNTING"],"baseOriginalFavoriteId":"6af3e2e5be034e1cbebec9fda1d74c98","baseSelectionRows":10430}}
+
+        response = requests.post(url, headers=HEADERS, json=payload  )
+        data = response.json()
+        report_path_raw = data["return"]["ReportPath"]
+        report_path = report_path_raw.replace(" ", "%20")
+
+        # Step 2: Get Nonce
+        nonceUrl = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/Security/Nonce"
+        payload = {}
+        response = requests.post(nonceUrl, headers=HEADERS, json=payload  )
+        nonce = response.json()
+
+        # Step 3: Get Viewer
+        url = "https://qcadeltek03.qcasystems.com/vantagepoint/reporting/viewer.aspx?&nonce="+nonce+"&ResetReportViewerOnPreview=Y&reportPath="+report_path+"&allowSchedule=Y&origReportPath=/Standard/Project/Project%20List&reportName=Project%20List"
+
+        # Step 4: Get report session
+        response = requests.get(url, headers=HEADERS )
+        html = response.text
+        report_session = re.search(r"ReportSession=([A-Za-z0-9]+)", html)
+        control_id = re.search(r"ControlID=([A-Za-z0-9]+)", html)
+        sqlrsReportViewer = re.search(r'_token="([^"]+)"', html)
+
+        if not (report_session and control_id):
+            raise RuntimeError("Error")
+        
+        exportFileName_csv = "Project List_"+ date.today().strftime("%Y-%m-%d") + ".csv"
+
+        # Step 5: Download the csv report
+        url = ( "https://qcadeltek03.qcasystems.com"
+                "/Vantagepoint/Reporting/Reserved.ReportViewerWebControl.axd"
+                f"?ReportSession={report_session.group(1)}"
+                "&Culture=1033&CultureOverrides=True"
+                "&UICulture=2057&UICultureOverrides=True"
+                "&ReportStack=1"
+                f"&ControlID={control_id.group(1)}"
+                "&RSProxy=https%3a%2f%2fqcadeltek03.qcasystems.com%2fReportServer"
+                "&OpType=Export&FileName=Project+List&ContentDisposition=OnlyHtmlInline&Format=CSV" )
+        
+        response = requests.get(url, headers = HEADERS,stream=True  )
+        if response.status_code == 200 and response.headers.get("Content-Type") == "text/csv; charset=utf-8":
+            csvName = os.path.join(r"C:\\temp\\revenue_accrual", exportFileName_csv)
+            if os.path.exists(csvName):
+                os.remove(csvName)
+            with open(csvName, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            print("✅ "+ csvName+" Downloaded")
+
+        # Trim the csv file
+        temp_file = csvName + ".temp"
+        lines_to_skip = 4
+
+        with open(csvName, 'r', encoding='utf-8', newline='') as f_in, \
+            open(temp_file, 'w', encoding='utf-8', newline='') as f_out:
+            reader = csv.reader(f_in)
+            writer = csv.writer(f_out)
+            for _ in range(lines_to_skip):
+                next(reader, None)
+            for row in reader:
+                writer.writerow(row)
+
+        os.replace(temp_file, csvName)
+        
+        return os.path.abspath(csvName)
+
+    except Exception as e:
+        print("⚠️ Failed to update the project list:", e)
 
 
 def download_project_list(base_folder, need_trim = False):
@@ -571,6 +654,8 @@ def download_project_list(base_folder, need_trim = False):
                     writer.writerow(row)
 
             os.replace(temp_file, csvName)
+        
+        return os.path.abspath(csvName)
 
     except Exception as e:
         print("⚠️ Failed to update the project list:", e)
@@ -1037,9 +1122,19 @@ def download_project_expense(base_folder, pkey, option_name):
         print("⚠️ Failed to download the project expense:", e)
 
 
-def download_JTD_Billing(base_folder, pkey = "", option_name = ""):
+def download_JTD_Billing(base_folder, pkey = "", option_name = "", end_period = ""):
     HEADERS = util.set_headers()
+    
     download_template(base_folder, TEMPLATE1)
+    targetFile = os.path.join(base_folder, TEMPLATE1)
+    csvName = download_total_project_list()
+    util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="Project List", onlyValue=True,  targetCell='A2')
+
+
+    csvName = download_GL(base_folder=base_folder, startPeriod='200301', endPeriod=end_period, needDownload=True, baseRecordSelection={"pKey":None,"name":"Records Selected","type":"CA","whereClauseSearch":"N","isLegacy":"N","searchOptions":[{"name":"Name","value":"USD","type":"string","seq":1,"tableName":"CA","opp":"LIKE","condition":"or","searchLevel":0,"valueDescription":"USD"},{"name":"Name","value":"USA","type":"string","seq":2,"tableName":"CA","opp":"LIKE","condition":"and","searchLevel":0,"valueDescription":"USA"}]}, fileName="US ")
+
+    util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="USD Revenue GL", onlyValue=True)
+    
     try:
         url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/Reporting/Build"
         baseRecordSelection = {"pKey": pkey ,"name":option_name ,"type":"wbs1","whereClauseSearch":"N","isLegacy":"N"}
@@ -1110,7 +1205,6 @@ def download_JTD_Billing(base_folder, pkey = "", option_name = ""):
 
         os.replace(temp_file, csvName)
         
-        targetFile = os.path.join(base_folder, TEMPLATE1)
         util.excel_full_copy(inputFile=csvName, inputSheet=None, targetFile=targetFile, targetSheet="JTD Billing", onlyValue=True, targetCell='B6')
 
     except Exception as e:
@@ -1222,13 +1316,15 @@ def final_step(base_folder):
 
 
 def main():
-    global project_list
-    project_list = set()
+    print(util.get_onedrive_path())
 
-    base_folder = Path("C:\\temp\\revenue_model_export")
-    init(base_folder)
+    #global project_list
+    #project_list = set()
+
+    #base_folder = Path("C:\\temp\\revenue_model_export")
+    #init(base_folder)
     #get_search_list()
-    print(get_search_option_project_total(pkey="5a14b2d45288e71f3a6919c0e9f9c513"))
+    #download_serch_options_list(pkey="5a14b2d45288e71f3a6919c0e9f9c513")
     #download_template(base_folder, TEMPLATE1)
     #download_template(base_folder, TEMPLATE2)
     #start_period = input("Please input the start period (202601): ")

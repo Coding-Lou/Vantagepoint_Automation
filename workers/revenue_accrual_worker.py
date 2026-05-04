@@ -49,6 +49,8 @@ class RevenueAccrualWorker(BaseWorker):
 
             result = self.adapter.execute(
                 period=self.params.get("period"),
+                pkey=self.params.get("pkey", ""),
+                option_name=self.params.get("option_name", ""),
             )
             return result
         except Exception as e:

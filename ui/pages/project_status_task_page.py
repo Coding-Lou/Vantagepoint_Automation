@@ -43,7 +43,7 @@ class ProjectStatusTaskPage(BaseTaskPage):
         
         super().__init__(
             "project_status",
-            "project_status",
+            "Project Stauts",
             parent
         )
         

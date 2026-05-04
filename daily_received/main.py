@@ -299,7 +299,7 @@ def iterateLineItems():
 def init():
     global DATE
     DATE = datetime.now(ZoneInfo("America/Vancouver")).strftime("%Y-%m-%d")
-    #DATE = "2026-04-14"
+    #DATE = "2026-04-23"
     global HEADERS
     HEADERS = util.set_headers()
 

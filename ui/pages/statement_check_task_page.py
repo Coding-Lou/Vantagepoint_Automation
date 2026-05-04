@@ -49,21 +49,21 @@ class StatementCheckTaskPage(BaseTaskPage):
         tutorial_label = BodyLabel("How to Use")
         tutorial_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(tutorial_label)
-        
+
         tutorial_text = BodyLabel(
-            "1. Select a client from the dropdown menu.\n"
+            "1. Select a vendor from the dropdown menu.\n"
             "2. Enter invoice numbers separated by commas (e.g., INV001, INV002, INV003).\n"
             "3. Click 'Execute' to check the statement status for the invoices."
         )
         tutorial_text.setWordWrap(True)
         tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
-        
+
         # Spacer
         self.config_layout.addSpacing(12)
-        
-        # Client selection section
-        client_label = BodyLabel("Client")
+
+        # Vendor selection section
+        client_label = BodyLabel("Vendor")
         client_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(client_label)
         
@@ -117,30 +117,28 @@ class StatementCheckTaskPage(BaseTaskPage):
         self.config_layout.addWidget(self.invoice_edit)
     
     def _load_clients(self) -> None:
-        """Load clients from config.json STATEMENT_CHECK array."""
+        """Load vendors from config.json STATEMENT_CHECK array."""
+        # Map display name -> vendor key; used by _get_params / _validate_params
+        # because qfluentwidgets ComboBox does not reliably return currentData()
+        self._vendor_key_map: dict[str, str] = {}
         try:
             statement_check_config = util_module.get_config(["STATEMENT_CHECK"])
             if not statement_check_config:
                 return
-            
-            # Clear existing items
+
             self.client_combo.clear()
-            
-            # Add clients from config
-            # STATEMENT_CHECK is an array of objects like [{"ANIXTER CAD": "ANICAN"}, ...]
+
+            # STATEMENT_CHECK is an array of objects: [{"ANIXTER CAD": "ANICAN"}, ...]
             for client_obj in statement_check_config:
                 if isinstance(client_obj, dict):
-                    # Get the key (display name) and value (vendor key)
                     for display_name, vendor_key in client_obj.items():
-                        # Store vendor_key as item data
-                        self.client_combo.addItem(display_name, vendor_key)
-            
-            # Set default selection to first item if available
+                        self._vendor_key_map[display_name] = vendor_key
+                        self.client_combo.addItem(display_name)
+
             if self.client_combo.count() > 0:
                 self.client_combo.setCurrentIndex(0)
-        except Exception as e:
-            # If loading fails, add a placeholder
-            self.client_combo.addItem("No clients available", "")
+        except Exception:
+            self.client_combo.addItem("No vendors available")
     
     def _load_config(self) -> None:
         """Load configuration from config file (if any)."""
@@ -149,30 +147,26 @@ class StatementCheckTaskPage(BaseTaskPage):
     
     def _validate_params(self) -> Tuple[bool, str]:
         """Validate task parameters."""
-        # Check if a client is selected
         if self.client_combo.currentIndex() < 0:
-            return False, "Please select a client"
-        
-        vendor_key = self.client_combo.currentData()
+            return False, "Please select a vendor"
+
+        vendor_key = self._vendor_key_map.get(self.client_combo.currentText(), "")
         if not vendor_key:
-            return False, "Invalid client selection"
-        
-        # Check if invoice numbers are provided
+            return False, "Invalid vendor selection"
+
         invoice_numbers = self.invoice_edit.text().strip()
         if not invoice_numbers:
             return False, "Please enter at least one invoice number"
-        
-        # Validate that there's at least one non-empty invoice number
+
         invoice_list = [inv.strip() for inv in invoice_numbers.split(",") if inv.strip()]
         if not invoice_list:
             return False, "Please enter at least one valid invoice number"
-        
+
         return True, ""
-    
+
     def _get_params(self) -> Dict[str, Any]:
         """Get task parameters from UI."""
-        # Get vendor_key from selected client's item data
-        vendor_key = self.client_combo.currentData()
+        vendor_key = self._vendor_key_map.get(self.client_combo.currentText(), "")
         invoice_numbers = self.invoice_edit.text().strip()
         
         return {

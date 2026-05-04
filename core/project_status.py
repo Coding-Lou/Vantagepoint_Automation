@@ -511,12 +511,16 @@ def copy_to_template():
     excel.AlertBeforeOverwriting = False
     time.sleep(5)
     
-    def safe_com_call(func, retries=10, delay=1):
+    CALLEE_BUSY = -2147418111
+
+    def safe_com_call(func, retries=15, delay=3):
         for i in range(retries):
             try:
                 return func()
             except pythoncom.com_error as e:
-                log.info(f"⚠️ COM error occurred: {e}. Retrying {i+1}/{retries}...")
+                if getattr(e, 'hresult', None) != CALLEE_BUSY:
+                    raise
+                log.info(f"⚠️ COM busy, retrying {i+1}/{retries}...")
                 time.sleep(delay)
         raise RuntimeError("Excel remained busy after retries")
 

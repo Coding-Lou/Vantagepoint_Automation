@@ -49,14 +49,16 @@ def _safe_json(response, context):
         )
 
 def ar_init():
-    util.check_folder("ar_export")
-    util.clear_folder("ar_export")
+    ar_init_with_date(input("Statement Date (format 2025-05-01): "))
+
+def ar_init_with_date(date: str):
     global STATEMENTDATE
-    STATEMENTDATE = input("Statement Date (format 2025-05-01): ")
-    # User Setting
+    STATEMENTDATE = date
+    util.check_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ar_export"))
+    util.clear_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ar_export"))
     url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/UserSettings"
     payload = {"FW_SEUserOptions":[{"OptionName":"arReviewPaidStatus","OptionValue":"Unpaid","_transType":"U"}]}
-    requests.post(url, headers=HEADERS, json=payload )
+    requests.post(url, headers=HEADERS, json=payload)
 
 def init_output():
     global wb
@@ -120,7 +122,7 @@ def ar_download_csv():
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
-            print("✅ Full statements lists get")
+            print("✅ AR statement list downloaded")
         else:
             print(f"❌ Error, status code: {response.status_code}")
             print("Msg:", response.content[:500])
@@ -143,25 +145,26 @@ def ar_process():
                 value = row[2]
                 if value:
                     clientNames.add(value)
+    total = len(clientNames)
     zipClientName = []
     for i, clientName in enumerate(clientNames, start=1):
         global DUEINVOICE
         DUEINVOICE = ""
         if (not "QCA Systems Ltd." in clientName):
             try:
-                print("-----" + clientName + "-----")
+                print(f"\n▶ [{i}/{total}] {clientName}")
                 clientID = util.get_clientID(clientName)
                 data = ar_review(clientID)
                 email = util.get_vendor_email(clientID)
                 if email != '':
-                    print("✅ Vendor email: " + email)
+                    print(f"  ✅ Email: {email}")
                 else:
-                    print("❌ " + clientName + " mail not found")
+                    print(f"  ❌ Email not found")
                 fileName = ar_download_statement_pdf(clientID, clientName)
                 if fileName != '':
-                    print("✅ Vendor's statement download")
+                    print(f"  ✅ Statement downloaded")
                 else:
-                    print("❌ Error")
+                    print(f"  ❌ Statement download failed")
                 pmList = ""
                 if ( (data['Age2'] != "" and int(data['Age2']) > 0) or
                     (data['Age3'] != "" and int(data['Age3']) > 0) or
@@ -176,17 +179,9 @@ def ar_process():
                 ar_details(clientID)
                 if ar_need_zip(clientID, clientName):
                     zipClientName.append(clientName)
-                print(f"{'Client':<30} {'0-30':>12} {'31-45':>12} {'46-60':>12} {'61-90':>12} {'90+':>12}")
-                print("----------------------------------------------------------------------------------------------------------------")
-                print(f"{clientName[:30]:<30} "
-                      f"${data['Age1']:>12,.2f} "
-                      f"${data['Age2']:>12,.2f} "
-                      f"${data['Age3']:>12,.2f} "
-                      f"${data['Age4']:>12,.2f} "
-                      f"${data['Age5']:>12,.2f} ")
-                print("")
+                print(f"  Balance  0-30: ${data['Age1']:,.2f}  |  31-45: ${data['Age2']:,.2f}  |  46-60: ${data['Age3']:,.2f}  |  61-90: ${data['Age4']:,.2f}  |  90+: ${data['Age5']:,.2f}")
             except Exception as e:
-                print(f"❌ Error processing client {clientName}: {e}")
+                print(f"  ❌ Error: {e}")
                 continue
     return zipClientName
 
@@ -207,7 +202,7 @@ def ar_details(clientID):
         if r['Total'] <= 0 or clientID in EXCLUDE:
             continue
         ar_download_proj_invoice_pdf(r['WBS1'], clientID)
-        print('✅ ' + r['WBS1'] + " invoice download")
+        print(f"  ✅ {r['WBS1']} invoice downloaded")
 
 def ar_download_statement_pdf(clientID, clientName):
     try:
@@ -422,12 +417,12 @@ def ar_get_pm_list(clientID):
             response = requests.get(url, headers=HEADERS)
             data = _safe_json(response, f"Project plan API for project {projName}")[0]
             if data['ProjMgrEmail'] != '': 
-                print("✅ "+ proj['WBS1'] +" is due, PM email: " + data['ProjMgrEmail'])
+                print(f"  ✅ PM {proj['WBS1']}: {data['ProjMgrEmail']}")
                 if not data['ProjMgrEmail'] in list:
                     list.add(data['ProjMgrEmail'] )
                     pmList += data['ProjMgrEmail'] + ";"
             else:
-                print("❌ " +  proj['WBS1'] + " PM email not found")        
+                print(f"  ❌ PM email not found for {proj['WBS1']}")        
     return pmList
 
 def ar_need_zip(clientID, clientName):
@@ -493,7 +488,7 @@ def main():
     for clientName in zipClientName:
         clientID = util.get_clientID(clientName)
         ar_zipfile(clientID, clientName)
-    util.save_excel(wb, RECORDS)
+    util.save_excel(wb, RECORDS, folder_path=os.path.join(ONEDRIVEDIR, WORKDIR))
 
 if __name__ == "__main__":
     main()

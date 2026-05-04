@@ -34,7 +34,8 @@ def init_output():
     ws = wb.active
     ws.title = "Sheet1"
     ws.append(["ClientID","From","To","CC","Subject","AttachmentName","AttachmentContent","Body","Payee"])
-    util.clear_folder("ap_export")
+    util.check_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export"))
+    util.clear_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export"))
 
 def ap_setup_time():
     date = input("Input the Remittance Date (format 2025-05-01): ")
@@ -158,7 +159,7 @@ def ap_download_remittance(payment):
         response = requests.get(url_pdf, headers=HEADERS)
 
         if response.status_code == 200 and response.headers.get("Content-Type") == "application/pdf":
-            pdfName = os.path.join("ap_export", fileName)
+            pdfName = os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export", fileName)
             with open(pdfName, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
@@ -177,12 +178,13 @@ def ap_download_remittance(payment):
 
 
 def main():
-    util.check_folder("ap_export")
+    folder_path = os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export")
+    util.check_folder(folder_path)
     init_output()
     ap_setup_time()
     paymentsData = ap_get_remittance()
     ap_process_remittance(paymentsData)
-    util.save_excel(wb, RECORDS)
+    util.save_excel(wb, RECORDS, folder_path=os.path.join(ONEDRIVEDIR, WORKDIR))
 
 if __name__ == '__main__':
     main()

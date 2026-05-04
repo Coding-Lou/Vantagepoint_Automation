@@ -232,6 +232,10 @@ class ProjectStatusAdapter(BaseAdapter):
                 
                 ps_module.move_to_folder()
 
+                import subprocess
+                folder_path = os.path.join(os.getcwd(), "project status")
+                subprocess.Popen(["explorer", folder_path])
+
                 # Get output file path
                 from datetime import date
                 output_file = os.path.join(ps_dir, f"output_{date.today().strftime('%Y-%m-%d')}.xlsx")
