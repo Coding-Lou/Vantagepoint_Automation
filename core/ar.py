@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tools.util as util
 import requests
 import re
@@ -62,6 +64,11 @@ def ar_init_with_date(date: str):
 
 def init_output():
     global wb
+    output_dir = Path(os.path.join(ONEDRIVEDIR, WORKDIR))
+    if output_dir.is_dir():
+        for file_path in output_dir.glob("Job*.xlsx"):
+            file_path.unlink(missing_ok=True)
+            print(f"Deleted: {file_path}")
     wb = Workbook()
     ws = wb.active
     ws.title = "Sheet1"

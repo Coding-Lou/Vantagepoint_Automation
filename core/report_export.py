@@ -60,11 +60,10 @@ def get_search_list():
     data = requests.get(url, headers=HEADERS).json()
     search_list = []
     for item in data:
-        if item["Name"].startswith("Rev_"):
-            search_list.append({
-                "PKey": item["PKey"],
-                "Name": item["Name"]
-            })
+        search_list.append({
+            "PKey": item["PKey"],
+            "Name": item["Name"]
+        })
     search_list.sort(key=lambda x: x["Name"])
     print("Search List:", [f"{item['PKey']}: {item['Name']}" for item in search_list])
     return search_list

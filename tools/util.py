@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 import time
@@ -772,6 +773,7 @@ def move_and_replace_files(source_dir, target_dir):
     print("🏁 All files processed.")
 
 def get_onedrive_path():
+
     for key_path in [
         r"Software\Microsoft\OneDrive\Accounts\Business1",
         r"Software\Microsoft\OneDrive",
@@ -788,3 +790,47 @@ def get_onedrive_path():
         return Path(env_path)
     
     return None
+
+def save_new_search_options(header = "", projects = [], saveName = "", isPublic = True):
+    url = "https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/"
+    parent_key = hashlib.md5( str(int(time.time() * 1000)).encode() ).hexdigest()
+    search_options = []
+    if isPublic:
+        search_options.append( {"Seq":-100,"ParentKey":parent_key,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"[CREATOR_USERNAME]","ValueDescription":"Myself","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":"","SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"} )
+        search_options.append( {"Seq":-100,"ParentKey":parent_key,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"ACCOUNTANT","ValueDescription":"ACCOUNTANT","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":"","SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"} )
+        search_options.append( {"Seq":-100,"ParentKey":parent_key,"OptionName":"saveOptionRole","Type":"role","Operator":"=","Value":"ACCOUNTING","ValueDescription":"ACCOUNTING","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":"","SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"} )
+    else:
+        search_options.append({"Seq":-100,"ParentKey":parent_key,"OptionName":"saveOptionRole","Type":"user","Operator":"=","Value":"[CREATOR_USERNAME]","ValueDescription":"Myself","ReportOption":"N","Condition":"","TableName":"","CrossHubField":" ","CrossHubFieldType":"","SearchLevel":0,"PKey":"","_originalValues":{},"_transType":"I"})
+    
+    for project in projects:
+        search_options.append( {"Seq":1,"ParentKey":parent_key,"OptionName":"WBS1","Type":"wbs1","Operator":"=","Value":project,"ReportOption":"N","Condition":"and","TableName":"PR","CrossHubField":" ","CrossHubFieldType":"","SearchLevel":1,"PKey":"","_originalValues":{},"_transType":"I"} )
+    
+    payload = {
+        "Name": saveName,
+        "Type":"wbs1",
+        "Private":"N",
+        "Folder":"",
+        "LinkedPKey":"",
+        "WhereClauseSearch":"N",
+        "ResultsToDisplay":"",
+        "ListViewDisplay":"",
+        "SavedOptionsDetail": search_options,
+        "PKey":parent_key,
+        "Username":""
+    }
+
+    print(json.dumps(payload, indent=4))
+
+    response = requests.post(url, headers=header, json=payload)
+    if response.status_code == 201:
+        print(f"✅ Search options saved successfully. Total projects: {len(projects)}")
+    else:
+        print(f"❌ Failed to save search options. Status code: {response.status_code}, Response: {response.text}")
+
+def delete_search_options(header = "", key = ""):
+    try:
+        url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/SaveSearchOptions/{key}"
+        response = requests.delete(url = url, headers = header)
+    except Exception as e:
+        print("Error in deleting the search option")
+        

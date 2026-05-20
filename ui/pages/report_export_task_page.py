@@ -16,17 +16,23 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QGridLayout,
     QCheckBox,
-    QStackedWidget,
-    QWidget,
+    QDialog,
 )
 from PySide6.QtCore import Qt, Signal, Slot, QThread
 
 from qfluentwidgets import (
     ComboBox,
+    EditableComboBox,
+    LineEdit,
+    CheckBox,
     BodyLabel,
+    StrongBodyLabel,
     PushButton,
     PrimaryPushButton,
+    ToolButton,
+    FluentIcon,
     MessageBox,
+    MessageDialog,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
@@ -40,6 +46,135 @@ import core.report_export as re_module
 
 # Output folder — matches core/report_export.py main()
 _BASE_FOLDER = Path("C:/temp/revenue_model_export")
+
+# ──────────────────────────────────────────────────────────────
+# Searchable combo box for Project Scope
+# ──────────────────────────────────────────────────────────────
+
+class _SearchableScopeComboBox(EditableComboBox):
+    """EditableComboBox that filters the dropdown by typed text.
+
+    Filtering is applied at menu-open time by temporarily replacing self.items
+    with a filtered subset.  The click handler uses findText() (text-based
+    lookup), so restoring self.items before the user clicks is safe.
+    Also suppresses the default behaviour of creating a new item when the user
+    presses Return on unmatched text.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._master_items: list = []
+
+    def addItem(self, text, icon=None, userData=None) -> None:
+        from qfluentwidgets.components.widgets.combo_box import ComboItem
+        self.items.append(ComboItem(text, icon, userData))
+
+    def _showComboMenu(self) -> None:
+        query = self.text().strip().lower()
+        if query:
+            filtered = [item for item in self._master_items if query in item.text.lower()]
+            original_items = self.items
+            original_index = self._currentIndex
+            self.items = filtered if filtered else list(self._master_items)
+            self._currentIndex = -1
+            try:
+                super()._showComboMenu()
+            finally:
+                self.items = original_items
+                self._currentIndex = original_index
+        else:
+            super()._showComboMenu()
+
+    def _onReturnPressed(self) -> None:
+        text = self.text()
+        if not text:
+            return
+        index = self.findText(text)
+        if index >= 0 and index != self.currentIndex():
+            self._currentIndex = index
+            self.currentIndexChanged.emit(index)
+
+
+# ──────────────────────────────────────────────────────────────
+# New Scope dialog
+# ──────────────────────────────────────────────────────────────
+
+class _NewScopeDialog(QDialog):
+    """Modal form for creating a new Project Scope search option."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("New Project Scope")
+        self.setFixedWidth(440)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 20)
+        layout.setSpacing(10)
+
+        title = StrongBodyLabel("New Project Scope")
+        title.setStyleSheet("font-size: 15px;")
+        layout.addWidget(title)
+        layout.addSpacing(4)
+
+        layout.addWidget(BodyLabel("Scope Name"))
+        self.name_edit = LineEdit()
+        self.name_edit.setPlaceholderText("e.g. Q2 2026 Active Projects")
+        layout.addWidget(self.name_edit)
+
+        layout.addWidget(BodyLabel("Project List (comma-separated)"))
+        self.project_edit = LineEdit()
+        self.project_edit.setPlaceholderText("e.g. P001, P002, P003")
+        layout.addWidget(self.project_edit)
+
+        self.public_check = CheckBox("Public (visible to all accounting roles)")
+        self.public_check.setChecked(True)
+        layout.addWidget(self.public_check)
+
+        self.error_label = BodyLabel("")
+        self.error_label.setStyleSheet(f"color: {ThemeColors.status_error()}; font-size: 11px;")
+        self.error_label.setVisible(False)
+        layout.addWidget(self.error_label)
+
+        layout.addSpacing(6)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.cancel_btn = PushButton("Cancel")
+        self.confirm_btn = PrimaryPushButton("Confirm")
+        btn_row.addWidget(self.cancel_btn)
+        btn_row.addWidget(self.confirm_btn)
+        layout.addLayout(btn_row)
+
+        self.cancel_btn.clicked.connect(self.reject)
+        self.confirm_btn.clicked.connect(self._on_confirm)
+
+    def _on_confirm(self) -> None:
+        name = self.name_edit.text().strip()
+        if not name:
+            self.error_label.setText("Scope name is required.")
+            self.error_label.setVisible(True)
+            return
+
+        projects = [p.strip() for p in self.project_edit.text().split(",") if p.strip()]
+        is_public = self.public_check.isChecked()
+
+        try:
+            self.confirm_btn.setEnabled(False)
+            headers = util_module.set_headers()
+            util_module.save_new_search_options(
+                header=headers,
+                projects=projects,
+                saveName=name,
+                isPublic=is_public,
+            )
+            self.accept()
+        except Exception as e:
+            self.error_label.setText(f"Save failed: {e}")
+            self.error_label.setVisible(True)
+            self.confirm_btn.setEnabled(True)
+
 
 # ──────────────────────────────────────────────────────────────
 # Inline mini-workers for Block 3 background operations
@@ -250,7 +385,7 @@ class ReportExportTaskPage(BaseTaskPage):
     def _build_sop(self) -> None:
         body = BodyLabel(
             "1. Select Start and End Periods using the year/month selectors.\n"
-            "2. Select a Project Scope. Click Download List to verify, or Generate to create a new one.\n"
+            "2. Select a Project Scope, or click + to create one. Leave empty to auto-generate on Execute.\n"
             "3. Check the reports to export, then click Execute."
         )
         body.setWordWrap(True)
@@ -280,50 +415,43 @@ class ReportExportTaskPage(BaseTaskPage):
         self.config_layout.addWidget(header)
 
         row = QHBoxLayout()
-        row.setSpacing(12)
+        row.setSpacing(8)
         row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        # Dropdown
-        self.search_option_combo = ComboBox()
-        self.search_option_combo.setStyleSheet(_combo_style())
+        self.search_option_combo = _SearchableScopeComboBox()
+        self.search_option_combo.setPlaceholderText("Type to filter scopes...")
         self.search_option_combo.setMinimumWidth(220)
         self.search_option_combo.currentIndexChanged.connect(self._on_search_option_changed)
         row.addWidget(self.search_option_combo)
 
-        # Right stacked panel: page 0 = existing option, page 1 = Add New
-        self.search_right_panel = QStackedWidget()
+        self.scope_refresh_btn = ToolButton(FluentIcon.SYNC)
+        self.scope_refresh_btn.setFixedSize(32, 32)
+        self.scope_refresh_btn.clicked.connect(self._load_search_options)
+        row.addWidget(self.scope_refresh_btn)
 
-        # ── Page 0: Total count + Download List ──
-        existing_page = QWidget()
-        ex_layout = QHBoxLayout(existing_page)
-        ex_layout.setContentsMargins(0, 0, 0, 0)
-        ex_layout.setSpacing(12)
-        ex_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        self.scope_add_btn = ToolButton(FluentIcon.ADD)
+        self.scope_add_btn.setFixedSize(32, 32)
+        self.scope_add_btn.clicked.connect(self._on_add_scope_clicked)
+        row.addWidget(self.scope_add_btn)
+
+        self.scope_delete_btn = ToolButton(FluentIcon.REMOVE)
+        self.scope_delete_btn.setFixedSize(32, 32)
+        self.scope_delete_btn.setEnabled(False)
+        self.scope_delete_btn.clicked.connect(self._on_delete_scope_clicked)
+        row.addWidget(self.scope_delete_btn)
+
+        row.addSpacing(4)
 
         self.total_projects_label = BodyLabel("Total: —")
         self.total_projects_label.setStyleSheet(f"font-size: 12px; color: {ThemeColors.text_muted()};")
-        ex_layout.addWidget(self.total_projects_label)
+        row.addWidget(self.total_projects_label)
 
         self.dl_list_btn = PushButton("Download List")
         self.dl_list_btn.setMinimumWidth(120)
+        self.dl_list_btn.setEnabled(False)
         self.dl_list_btn.clicked.connect(self._on_download_search_list_clicked)
-        ex_layout.addWidget(self.dl_list_btn)
+        row.addWidget(self.dl_list_btn)
 
-        # ── Page 1: Auto-generate note (triggered on Execute) ──
-        add_new_page = QWidget()
-        an_layout = QHBoxLayout(add_new_page)
-        an_layout.setContentsMargins(0, 0, 0, 0)
-        an_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
-
-        add_new_note = BodyLabel("A new scope will be generated automatically when you click Execute.")
-        add_new_note.setStyleSheet(f"font-size: 11px; color: {ThemeColors.text_muted()};")
-        add_new_note.setWordWrap(True)
-        an_layout.addWidget(add_new_note)
-
-        self.search_right_panel.addWidget(existing_page)   # index 0
-        self.search_right_panel.addWidget(add_new_page)    # index 1
-
-        row.addWidget(self.search_right_panel)
         row.addStretch()
 
         self.config_layout.addLayout(row)
@@ -419,23 +547,25 @@ class ReportExportTaskPage(BaseTaskPage):
 
             self.search_option_combo.blockSignals(True)
             self.search_option_combo.clear()
+            self.search_option_combo.setText("")
             for item in items:
                 self.search_option_combo.addItem(item["Name"], userData=item["PKey"])
-            self.search_option_combo.addItem("+ Add New", userData=None)
             self.search_option_combo.blockSignals(False)
 
-            if self.search_option_combo.count() > 0:
-                self.search_option_combo.blockSignals(True)
-                self.search_option_combo.setCurrentIndex(0)
-                self.search_option_combo.blockSignals(False)
-                self._on_search_option_changed(0)
+            self.search_option_combo._master_items = list(self.search_option_combo.items)
+            self.total_projects_label.setText("Total: —")
+            self.dl_list_btn.setEnabled(False)
+            self.scope_delete_btn.setEnabled(False)
+
         except Exception as e:
             print(f"Error loading search options: {e}")
             self.search_option_combo.blockSignals(True)
             self.search_option_combo.clear()
-            self.search_option_combo.addItem("+ Add New", userData=None)
             self.search_option_combo.blockSignals(False)
-            self.search_right_panel.setCurrentIndex(1)
+            self.search_option_combo._master_items = []
+            self.total_projects_label.setText("Total: —")
+            self.dl_list_btn.setEnabled(False)
+            self.scope_delete_btn.setEnabled(False)
 
     def _selected_pkey(self) -> Optional[str]:
         idx = self.search_option_combo.currentIndex()
@@ -443,7 +573,7 @@ class ReportExportTaskPage(BaseTaskPage):
 
     def _selected_option_name(self) -> Optional[str]:
         text = self.search_option_combo.currentText()
-        return None if text == "+ Add New" else text
+        return text or None
 
     # ── Execute override ───────────────────────────────────────
 
@@ -459,7 +589,7 @@ class ReportExportTaskPage(BaseTaskPage):
             dlg.exec()
             return
 
-        # Auto-generate scope when "Add New" is selected
+        # Auto-generate scope when no scope is selected
         if self._selected_pkey() is None:
             end = self._end_period_value()
             if self._gen_worker and self._gen_worker.isRunning():
@@ -479,15 +609,15 @@ class ReportExportTaskPage(BaseTaskPage):
     def _on_generate_for_execute_done(self, pkey: str, option_name: str) -> None:
         self._append_log("SUCCESS", f"Scope created: {option_name}")
 
-        # Insert the new option directly before "+ Add New" — no network call needed.
+        # Add the generated option and select it — no network reload needed.
         combo = self.search_option_combo
         combo.blockSignals(True)
-        add_new_idx = combo.count() - 1          # last item is always "+ Add New"
-        combo.insertItem(add_new_idx, option_name, userData=pkey)
-        combo.setCurrentIndex(add_new_idx)       # select the newly inserted item
+        combo.addItem(option_name, userData=pkey)
+        combo._master_items = list(combo.items)
+        new_idx = combo.count() - 1
+        combo.setCurrentIndex(new_idx)
         combo.blockSignals(False)
-        # Update the right-panel stacked widget to show Total/Download for this option
-        self._on_search_option_changed(add_new_idx)
+        self._on_search_option_changed(new_idx)
 
         self.execute_btn.setEnabled(True)
         # Do NOT call super()._on_execute_clicked() — it would:
@@ -558,10 +688,12 @@ class ReportExportTaskPage(BaseTaskPage):
     def _on_search_option_changed(self, index: int) -> None:
         pkey = self.search_option_combo.itemData(index)
         if pkey is None:
-            self.search_right_panel.setCurrentIndex(1)
+            self.total_projects_label.setText("Total: —")
+            self.dl_list_btn.setEnabled(False)
+            self.scope_delete_btn.setEnabled(False)
             return
 
-        self.search_right_panel.setCurrentIndex(0)
+        self.scope_delete_btn.setEnabled(True)
         self.total_projects_label.setText("Total: loading...")
         self.dl_list_btn.setEnabled(False)
 
@@ -612,6 +744,33 @@ class ReportExportTaskPage(BaseTaskPage):
         if is_logged_in:
             self._load_periods()
             self._load_search_options()
+
+    @Slot()
+    def _on_add_scope_clicked(self) -> None:
+        dialog = _NewScopeDialog(self.window())
+        if dialog.exec():
+            self._append_log("INFO", "New scope saved — refreshing list...")
+            self._load_search_options()
+
+    @Slot()
+    def _on_delete_scope_clicked(self) -> None:
+        pkey = self._selected_pkey()
+        if not pkey:
+            return
+        name = self._selected_option_name() or "this scope"
+        dialog = MessageDialog(
+            "Delete Scope",
+            f'Delete "{name}"? This cannot be undone.',
+            self.window(),
+        )
+        if dialog.exec():
+            try:
+                headers = util_module.set_headers()
+                util_module.delete_search_options(header=headers, key=pkey)
+                self._append_log("INFO", f'Scope "{name}" deleted — refreshing list...')
+                self._load_search_options()
+            except Exception as e:
+                self._append_log("ERROR", f"Delete failed: {e}")
 
     # ── Utilities ──────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+from pathlib import Path
 import sys
 import tools.util as util
 from openpyxl import Workbook
@@ -34,6 +35,11 @@ def init_output():
     ws = wb.active
     ws.title = "Sheet1"
     ws.append(["ClientID","From","To","CC","Subject","AttachmentName","AttachmentContent","Body","Payee"])
+    output_dir = Path(os.path.join(ONEDRIVEDIR, WORKDIR))
+    if output_dir.is_dir():
+        for file_path in output_dir.glob("Job*.xlsx"):
+            file_path.unlink(missing_ok=True)
+            print(f"Deleted: {file_path}")
     util.check_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export"))
     util.clear_folder(os.path.join(ONEDRIVEDIR, WORKDIR, "ap_export"))
 
