@@ -18,6 +18,7 @@ import sys
 import win32com.client
 import pythoncom
 import winreg
+import traceback
 
 # Shared lock — prevents concurrent reads from seeing a half-written config file.
 # config_manager.py imports this same lock so all config I/O is serialized.
@@ -819,8 +820,6 @@ def save_new_search_options(header = "", projects = [], saveName = "", isPublic 
         "Username":""
     }
 
-    print(json.dumps(payload, indent=4))
-
     response = requests.post(url, headers=header, json=payload)
     if response.status_code == 201:
         print(f"✅ Search options saved successfully. Total projects: {len(projects)}")
@@ -833,4 +832,100 @@ def delete_search_options(header = "", key = ""):
         response = requests.delete(url = url, headers = header)
     except Exception as e:
         print("Error in deleting the search option")
-        
+
+def get_firm_key(query = "", headers = ""):
+    try:
+        token = get_config(["TOKEN"])
+        url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/visionservices.asmx/GetLookupHash"
+        payload = {"sessionID": token, "hash": {"applyReadSecurity": "", "approvalsItemList": "", "campaignId": "", "chargeType": "", "clientId": "", "clientOnly": "N", "contactId": "", "contactOnly": "N", "custcolname": "", "custInfoCenterArea": "", "employeeOnly": "N", "exclude": "N", "excludeEmpsNotInMaster": "", "exclusionType": "", "filter": query, "filterHash": {}, "includeAllCompany": "N", "includeClientId": "", "includeCompleteAddress": "", "includeContactId": "", "includeCurrency": "", "includeEmployeeDefaultBank": "N", "includeEmpsWithoutUser": "Y", "includeOppId": "", "includeRecordCount": False, "includeWBS1": "", "laborCategory": "", "lookuptype": "clientvendor", "minWbsLevel": 1, "notCampaignId": "", "notClientId": "", "notContactId": "", "notEmployeeId": "", "notOppCompId": "", "notOppId": "", "notVendor": "", "notWBS1": "", "organization": "", "projectId": "", "projectStep": "", "reportTypes": "", "resourceType": "", "restrictChargeCompanies": "N", "rpProjectLookupProjectOnly": False, "searchType": "ALL", "selectedRecordId": "", "sortDef": "", "vendor": "", "vendorCompany": "", "vendorOnly": "N", "wbs1": "", "batchBilling": "", "submitted": "", "rejected": "", "savedSearchPKey": "", "excludeSelectedResultIdsOption": False, "approvedVendorsOnly": "N", "vendorsFromFinalPO": "N"}, "page": 1, "pagesize": 100, "order": "name", "SessionID": token}
+        records = requests.post(url = url, headers = headers, json=payload).json()['d']
+        data = []
+        for record in records:
+            data.append({
+                "name": record["Desc"],
+                "key": record["Key"]
+            })
+        return data
+    except Exception as e:
+        print("Error in querying the firm list")
+
+def run_excel_macro(file_path, macro_name, visible=False, save=True):
+    """
+    Robustly run an Excel VBA macro from Python.
+
+    Args:
+        file_path (str): Full path to .xlsm file
+        macro_name (str): Macro name, e.g. 'your_file.xlsm!Macro1'
+        visible (bool): Whether Excel UI is visible
+        save (bool): Save workbook after execution
+    """
+
+    excel = None
+    workbook = None
+
+    try:
+        # Ensure correct COM initialization in some environments
+        pythoncom.CoInitialize()
+
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Excel file not found: {file_path}")
+
+        # Start Excel
+        excel = win32com.client.DispatchEx("Excel.Application")
+        excel.Visible = visible
+        excel.DisplayAlerts = False
+        excel.AskToUpdateLinks = False
+
+        # Open workbook
+        workbook = excel.Workbooks.Open(
+            file_path,
+            UpdateLinks=0,
+            ReadOnly=False
+        )
+
+        # Small delay improves stability for heavy files/macros
+        time.sleep(1)
+
+        # Run macro
+        excel.Application.Run(macro_name)
+
+        # Wait a bit if macro triggers async operations
+        time.sleep(1)
+
+        # Save if required
+        if save:
+            workbook.Save()
+
+        workbook.Close(SaveChanges=save)
+        workbook = None
+
+        excel.Quit()
+        excel = None
+
+        return True
+
+    except Exception as e:
+        print("ERROR running Excel macro:")
+        print(traceback.format_exc())
+
+        # Attempt cleanup even on failure
+        try:
+            if workbook is not None:
+                workbook.Close(SaveChanges=False)
+        except:
+            pass
+
+        try:
+            if excel is not None:
+                excel.Quit()
+        except:
+            pass
+
+        return False
+
+    finally:
+        # Ensure COM is released (prevents orphan EXCEL.EXE processes)
+        try:
+            pythoncom.CoUninitialize()
+        except:
+            pass

@@ -178,15 +178,21 @@ def ar_process():
                     (data['Age4'] != "" and int(data['Age4']) > 0) or
                     (data['Age5'] != "" and int(data['Age5']) > 0) ):
                     pmList = ar_get_pm_list(clientID)
+                
+                print(f"  Balance  0-30: ${data['Age1']:,.2f}  |  31-45: ${data['Age2']:,.2f}  |  46-60: ${data['Age3']:,.2f}  |  61-90: ${data['Age4']:,.2f}  |  90+: ${data['Age5']:,.2f}")
 
                 tableContent = '<table border="1" width="500" style="border-collapse: collapse"><thead><tr style="text-align: center;"><th>Invoice</th><th>0-30</th><th>31-45</th><th>46-60</th><th>61-90</th><th>90+</th></tr></thead><tbody>'
                 tableContent += ar_generate_invoices_table(clientID)
                 tableContent += "</tbody></table>"
-                ar_create_record(clientID, clientName, email, fileName, pmList, tableContent)
-                ar_details(clientID)
-                if ar_need_zip(clientID, clientName):
-                    zipClientName.append(clientName)
-                print(f"  Balance  0-30: ${data['Age1']:,.2f}  |  31-45: ${data['Age2']:,.2f}  |  46-60: ${data['Age3']:,.2f}  |  61-90: ${data['Age4']:,.2f}  |  90+: ${data['Age5']:,.2f}")
+
+                check = ar_details(clientID)
+                if check:
+                    ar_create_record(clientID, clientName, email, fileName, pmList, tableContent)
+                    if ar_need_zip(clientID, clientName):
+                        zipClientName.append(clientName)
+                else:
+                    print("Only has the credit invoices, exclude from the list.")
+                
             except Exception as e:
                 print(f"  ❌ Error: {e}")
                 continue
@@ -205,11 +211,15 @@ def ar_details(clientID):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
     records = _safe_json(response, f"AR details API for client {clientID}")
+    has_positive_invoice = False
     for r in records:
         if r['Total'] <= 0 or clientID in EXCLUDE:
             continue
+        has_positive_invoice = True
         ar_download_proj_invoice_pdf(r['WBS1'], clientID)
         print(f"  ✅ {r['WBS1']} invoice downloaded")
+    
+    return has_positive_invoice
 
 def ar_download_statement_pdf(clientID, clientName):
     try:

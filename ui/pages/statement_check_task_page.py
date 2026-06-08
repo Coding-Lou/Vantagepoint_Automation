@@ -3,21 +3,16 @@ Statement Check task page with modern Fluent Design.
 
 Task: Check statement status for invoices.
 """
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 
 from PySide6.QtWidgets import (
-    QFormLayout,
     QHBoxLayout,
 )
-from PySide6.QtCore import Qt
-
 from qfluentwidgets import (
     ComboBox,
     LineEdit,
     BodyLabel,
-    PrimaryPushButton,
     PushButton,
-    FluentIcon,
 )
 
 from ui.pages.base_task_page import BaseTaskPage
@@ -30,19 +25,17 @@ class StatementCheckTaskPage(BaseTaskPage):
     """
     Task page for statement check.
     """
-    
+
     def __init__(self, parent=None):
-        """Initialize Statement Check task page."""
         super().__init__(
             "statement_check",
             "Vendor Statement Check",
             parent
         )
-    
+
     def _get_page_description(self) -> str:
-        """Get page description."""
         return "Check statement status for vendor invoices to verify if they have been vouched."
-    
+
     def _create_config_widgets(self) -> None:
         """Create configuration widgets with modern Fluent Design."""
         # Tutorial section
@@ -51,28 +44,46 @@ class StatementCheckTaskPage(BaseTaskPage):
         self.config_layout.addWidget(tutorial_label)
 
         tutorial_text = BodyLabel(
-            "1. Select a vendor from the dropdown menu.\n"
-            "2. Enter invoice numbers separated by commas (e.g., INV001, INV002, INV003).\n"
-            "3. Click 'Execute' to check the statement status for the invoices."
+            "1. Type part of the vendor name and click 'Search'.\n"
+            "2. Select the correct vendor from the results list.\n"
+            "3. Enter invoice numbers separated by commas (e.g., INV001, INV002).\n"
+            "4. Click 'Execute' to check the statement status."
         )
         tutorial_text.setWordWrap(True)
         tutorial_text.setStyleSheet(ThemeColors.get_tutorial_box_style())
         self.config_layout.addWidget(tutorial_text)
 
-        # Spacer
         self.config_layout.addSpacing(12)
 
-        # Vendor selection section
-        client_label = BodyLabel("Vendor")
-        client_label.setStyleSheet("font-weight: 600; font-size: 13px;")
-        self.config_layout.addWidget(client_label)
-        
-        self.client_combo = ComboBox()
+        # Vendor search section
+        vendor_label = BodyLabel("Vendor")
+        vendor_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        self.config_layout.addWidget(vendor_label)
+
+        search_row = QHBoxLayout()
+        search_row.setSpacing(8)
+
+        self.vendor_search_edit = LineEdit()
+        self.vendor_search_edit.setPlaceholderText("Type vendor name...")
+        self.vendor_search_edit.setStyleSheet(
+            f"LineEdit {{ {ThemeColors.get_input_style()} }}"
+        )
+        self.vendor_search_edit.returnPressed.connect(self._on_search)
+        search_row.addWidget(self.vendor_search_edit, 1)
+
+        self.search_btn = PushButton("Search")
+        self.search_btn.clicked.connect(self._on_search)
+        search_row.addWidget(self.search_btn)
+
+        self.config_layout.addLayout(search_row)
+
+        # Results combo (hidden until search returns results)
         bg = ThemeColors.background_input()
         text = ThemeColors.text_primary()
         border = ThemeColors.border_primary()
         arrow_color = ThemeColors.text_secondary()
-        self.client_combo.setStyleSheet(f"""
+        self.vendor_combo = ComboBox()
+        self.vendor_combo.setStyleSheet(f"""
             ComboBox {{
                 padding: 6px;
                 border: 1px solid {border};
@@ -92,65 +103,69 @@ class StatementCheckTaskPage(BaseTaskPage):
                 margin-right: 4px;
             }}
         """)
-        
-        # Load clients from config
-        self._load_clients()
-        self.config_layout.addWidget(self.client_combo)
-        
-        # Spacer
+        self.vendor_combo.setVisible(False)
+        # internal map: display name -> vendor key
+        self._vendor_key_map: dict[str, str] = {}
+        self.config_layout.addWidget(self.vendor_combo)
+
         self.config_layout.addSpacing(12)
-        
+
         # Invoice numbers section
         invoice_label = BodyLabel("Invoice Numbers")
         invoice_label.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.config_layout.addWidget(invoice_label)
-        
+
         self.invoice_edit = LineEdit()
         self.invoice_edit.setPlaceholderText("INV001, INV002, INV003 (comma-separated)")
         self.invoice_edit.setStyleSheet(
-            f"""
-            LineEdit {{
-                {ThemeColors.get_input_style()}
-            }}
-            """
+            f"LineEdit {{ {ThemeColors.get_input_style()} }}"
         )
         self.config_layout.addWidget(self.invoice_edit)
-    
-    def _load_clients(self) -> None:
-        """Load vendors from config.json STATEMENT_CHECK array."""
-        # Map display name -> vendor key; used by _get_params / _validate_params
-        # because qfluentwidgets ComboBox does not reliably return currentData()
-        self._vendor_key_map: dict[str, str] = {}
+
+    def _on_search(self) -> None:
+        """Call util.get_firm_key() with the typed query and populate the combo."""
+        query = self.vendor_search_edit.text().strip()
+        if not query:
+            return
+
+        self.search_btn.setEnabled(False)
+        self.search_btn.setText("Searching...")
+
         try:
-            statement_check_config = util_module.get_config(["STATEMENT_CHECK"])
-            if not statement_check_config:
-                return
-
-            self.client_combo.clear()
-
-            # STATEMENT_CHECK is an array of objects: [{"ANIXTER CAD": "ANICAN"}, ...]
-            for client_obj in statement_check_config:
-                if isinstance(client_obj, dict):
-                    for display_name, vendor_key in client_obj.items():
-                        self._vendor_key_map[display_name] = vendor_key
-                        self.client_combo.addItem(display_name)
-
-            if self.client_combo.count() > 0:
-                self.client_combo.setCurrentIndex(0)
+            headers = util_module.set_headers()
+            results: List[Dict] = util_module.get_firm_key(query=query, headers=headers) or []
         except Exception:
-            self.client_combo.addItem("No vendors available")
-    
-    def _load_config(self) -> None:
-        """Load configuration from config file (if any)."""
-        # Reload clients in case config was updated
-        self._load_clients()
-    
-    def _validate_params(self) -> Tuple[bool, str]:
-        """Validate task parameters."""
-        if self.client_combo.currentIndex() < 0:
-            return False, "Please select a vendor"
+            results = []
+        finally:
+            self.search_btn.setEnabled(True)
+            self.search_btn.setText("Search")
 
-        vendor_key = self._vendor_key_map.get(self.client_combo.currentText(), "")
+        self._vendor_key_map.clear()
+        self.vendor_combo.clear()
+
+        if not results:
+            self.vendor_combo.setVisible(False)
+            return
+
+        for item in results:
+            name = item.get("name", "")
+            key = item.get("key", "")
+            if name:
+                self._vendor_key_map[name] = key
+                self.vendor_combo.addItem(name)
+
+        self.vendor_combo.setCurrentIndex(0)
+        self.vendor_combo.setVisible(True)
+
+    def _load_config(self) -> None:
+        """Reload config (no-op here; search is on-demand)."""
+        pass
+
+    def _validate_params(self) -> Tuple[bool, str]:
+        if not self.vendor_combo.isVisible() or self.vendor_combo.count() == 0:
+            return False, "Please search for and select a vendor first"
+
+        vendor_key = self._vendor_key_map.get(self.vendor_combo.currentText(), "")
         if not vendor_key:
             return False, "Invalid vendor selection"
 
@@ -165,15 +180,12 @@ class StatementCheckTaskPage(BaseTaskPage):
         return True, ""
 
     def _get_params(self) -> Dict[str, Any]:
-        """Get task parameters from UI."""
-        vendor_key = self._vendor_key_map.get(self.client_combo.currentText(), "")
+        vendor_key = self._vendor_key_map.get(self.vendor_combo.currentText(), "")
         invoice_numbers = self.invoice_edit.text().strip()
-        
         return {
             "vendor_key": vendor_key,
-            "invoice_numbers": invoice_numbers,  # Comma-separated string
+            "invoice_numbers": invoice_numbers,
         }
-    
+
     def _create_worker(self, params: Dict[str, Any]) -> StatementCheckWorker:
-        """Create Statement Check worker."""
         return StatementCheckWorker(params)

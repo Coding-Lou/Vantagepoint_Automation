@@ -4,6 +4,7 @@ import requests
 import tools.util as util
 
 
+
 def check_statement(vendor_key: str, invoice_number: str) -> bool | None:
     """Query the ERP for a single invoice and print its payment status."""
     # Always fetch fresh headers to avoid stale auth credentials

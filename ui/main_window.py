@@ -36,8 +36,8 @@ from ui.pages.project_status_task_page import ProjectStatusTaskPage
 from ui.pages.revenue_accrual_task_page import RevenueAccrualTaskPage
 from ui.pages.statement_check_task_page import StatementCheckTaskPage
 from ui.pages.report_export_task_page import ReportExportTaskPage
+from ui.pages.pdf_merge_page import PdfMergePage
 from ui.pages.base_task_page import BaseTaskPage
-from ui.pages.scheduled_tasks_page import ScheduledTasksPage
 from ui.services.app_context import get_app_context
 from ui.widgets.login_dialog import LoginDialog
 from ui.widgets.settings_page import SettingsPage
@@ -378,6 +378,7 @@ class MainWindow(FluentWindow):
         self.task_pages["revenue_accrual"] = RevenueAccrualTaskPage()
         self.task_pages["statement_check"] = StatementCheckTaskPage()
         self.task_pages["report_export"] = ReportExportTaskPage()
+        self.task_pages["pdf_merge"] = PdfMergePage()
 
         # Task page icons use the opposite suffix convention from home/schedule.
         task_suffix = "_dark" if isDarkTheme() else "_light"
@@ -397,27 +398,6 @@ class MainWindow(FluentWindow):
             page.task_started.connect(self._on_task_started)
             page.task_finished.connect(self._on_task_finished)
             page.task_failed.connect(self._on_task_failed)
-
-        scheduled_tasks_page = ScheduledTasksPage()
-        scheduled_tasks_page.setObjectName("scheduled_tasks")
-        try:
-            self.addSubInterface(
-                interface=scheduled_tasks_page,
-                icon=self._load_icon("schedule", FluentIcon.CALENDAR, contrast_suffix),
-                text="Scheduled Tasks",
-                position=NavigationItemPosition.TOP,
-            )
-        except Exception:
-            # Fall back to a built-in FluentIcon if the custom icon cannot be loaded.
-            try:
-                self.addSubInterface(
-                    interface=scheduled_tasks_page,
-                    icon=FluentIcon.CALENDAR,
-                    text="Scheduled Tasks",
-                    position=NavigationItemPosition.TOP,
-                )
-            except Exception:
-                pass
 
         self._setup_bottom_navigation()
 
@@ -617,7 +597,7 @@ class MainWindow(FluentWindow):
                 ("project_status", "project_status", FluentIcon.DOCUMENT),
                 ("revenue_accrual", "revenue_accrual", FluentIcon.DOCUMENT),
                 ("statement_check", "statement_check", FluentIcon.DOCUMENT),
-                ("scheduled_tasks", "schedule", FluentIcon.CALENDAR),
+                ("pdf_merge", "pdf_merge", FluentIcon.DOCUMENT),
             ]:
                 try:
                     w = nav.panel.widget(route_key)
