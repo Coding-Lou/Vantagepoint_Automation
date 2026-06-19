@@ -88,23 +88,41 @@ def get_search_option_project_total(pkey):
     return data
 
 
-
 def update_template():
     username = getpass.getuser()  # safer than os.getlogin()
 
+    SHAREPOINT_SUBPATH = Path("03 Accounting/400 Process Improvement/Automation/template/Rev-Gen")
+    SHAREPOINT_LIBRARY = "QCA Accounting Dept - Documents"
+
     onedrive_root = util.get_onedrive_path()
 
+    source_path = None
+    candidates = []
+
     if onedrive_root:
-        source_path = onedrive_root / "QCA Accounting Dept - Documents/03 Accounting/400 Process Improvement/Automation/template/Rev-Gen"
         print(f"Success get the OneDrive path: {onedrive_root}")
+        # SharePoint libraries sync either inside the OneDrive folder or at the user home level
+        candidates = [
+            onedrive_root / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH,
+            Path.home() / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH,
+        ]
     else:
-        print("OneDrive path not found. Please ensure OneDrive is installed and configured correctly.")
+        print("OneDrive path not found. Trying fallback SharePoint library location.")
+        candidates = [Path.home() / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH]
+
+    for candidate in candidates:
+        if candidate.exists():
+            source_path = candidate
+            break
 
     save_path = Path("C:/temp/revenue_accrual")
 
     # Validate source
-    if not source_path.exists():
-        print(f"❌ Source does not exist: {source_path}")
+    if source_path is None:
+        print(f"❌ Template folder not found. Checked:")
+        for c in candidates:
+            print(f"   • {c}")
+        print(f"Please sync the SharePoint library '{SHAREPOINT_LIBRARY}' via OneDrive before running this task.")
         return
 
     # Remove destination if it exists

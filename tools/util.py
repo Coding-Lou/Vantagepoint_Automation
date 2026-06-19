@@ -403,8 +403,13 @@ def assamble_projects(projects):
     return searchOptions
 
 def check_folder(folderName):
-    if not os.path.exists(folderName):
-        os.makedirs(folderName)
+    onedrivedir = get_config(["ONEDRIVEDIR"])
+    workdir = get_config(["WORKDIR"])
+
+    folder_path = os.path.join(onedrivedir, workdir, folderName)
+
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
         print(f"📁 Folder created: {folderName}")
 
 def clear_folder(folderName):

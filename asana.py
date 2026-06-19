@@ -1,11 +1,13 @@
+import json
 import re
 import pdfplumber
 import requests
 import os
 import tools.util as util
+from domain.adapters.anixter import AnixterParser
 
 # 你的 Asana Personal Access Token
-
+ACCESS_TOKEN = ""
 DOWNLOAD_FOLDER = "vendor_invoice"
 util.check_folder(DOWNLOAD_FOLDER)
 
@@ -15,7 +17,7 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-# 1. 获取当前用户信息
+
 user_resp = requests.get("https://app.asana.com/api/1.0/users/me", headers=headers)
 user_resp.raise_for_status()
 user_data = user_resp.json()['data']
@@ -34,12 +36,14 @@ tasks_resp = requests.get("https://app.asana.com/api/1.0/tasks", headers=headers
 tasks_resp.raise_for_status()
 
 tasks = tasks_resp.json().get('data', [])
-print("未完成任务列表：")
+print("Incompleted Tasks：")
 for task in tasks:
-    if not re.search(pattern["WESTBURNE"], task['name']):
+    if not task["name"].startswith("Acct No. AXC"):
+        continue
+    if "Your Invoice From Anixter is Attached" not in task["name"]:
         continue
     task_gid = task["gid"]
-    # 获取任务的附件列表
+    
     attachments_url = f"https://app.asana.com/api/1.0/tasks/{task_gid}/attachments"
     resp = requests.get(attachments_url, headers=headers)
     resp.raise_for_status()
@@ -66,30 +70,7 @@ for task in tasks:
 
         print(f"Saved {attach_name} to {DOWNLOAD_FOLDER}")
 
-        with pdfplumber.open(os.path.join(DOWNLOAD_FOLDER, attach_name)) as pdf:
-            for page_num, page in enumerate(pdf.pages, start=1):
-                tables = page.extract_tables()
-                for table_index, table in enumerate(tables, start=1):
-                    fixed_table = []  # 存放拆分后的新表格
-                    header = table[0]
-                    fixed_table.append(header)
-                    print("-----------------------------")
-                    for row in table[1:]:
-                        # 找到包含换行符的单元格
-                        max_splits = max([len(str(cell).split('\n')) if cell else 1 for cell in row])
+        parser = AnixterParser()
 
-                        # 为每个换行分裂成多行
-                        new_rows = []
-                        for i in range(max_splits):
-                            new_row = []
-                            for cell in row:
-                                parts = str(cell).split('\n') if cell else ['']
-                                # 如果当前行没有对应部分，用空字符串填充
-                                new_row.append(parts[i] if i < len(parts) else '')
-                            new_rows.append(new_row)
-
-                        fixed_table.extend(new_rows)
-
-                    # 输出修正后的表格
-                    for r in fixed_table:
-                        print(r)
+        invoice = parser.parse(os.path.join(DOWNLOAD_FOLDER, attach_name))
+        print(json.dumps(invoice.to_dict(),indent=4,ensure_ascii=False))

@@ -14,11 +14,10 @@ import time
 import argparse
 from pathlib import Path
 from typing import Optional
-from PySide6.QtCore import QTimer
 from tools.runtime_logger import RuntimeLogger
 import tools.util as util
 import tools.login as login
-import os
+
 
 # =========================
 # Set up logger
@@ -358,7 +357,10 @@ def main() -> int:
     return launch_ui()
 
 
+
+
 if __name__ == "__main__":
+    #main()
 
     '''    
     import core.revenue_accrual as ra

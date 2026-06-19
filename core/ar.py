@@ -28,8 +28,6 @@ global ONEDRIVEDIR
 ONEDRIVEDIR = util.get_config(['ONEDRIVEDIR'])
 global WORKDIR
 WORKDIR = util.get_config(['WORKDIR'])
-global EXCLUDE
-EXCLUDE = util.get_config(['AR','EXCLUDE'])
 # Log Conifg
 global RECORDS
 RECORDS = 1
@@ -39,6 +37,7 @@ STATEMENTDATE = None
 def format_amount(val):
     return f"{val:,.2f}" if val and val > 0 else ""
 
+# Don't delete, there is some glitch in the system.
 def _safe_json(response, context):
     """Parse response JSON with actionable error context."""
     try:
@@ -146,7 +145,7 @@ def ar_process():
     clientNames = set()
     with open(os.path.join(ONEDRIVEDIR, WORKDIR, "result.csv"), mode='r', newline='', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile)
-        headers = next(reader)
+        next(reader)
         for row in reader:
             if len(row) >= 3:
                 value = row[2]
@@ -155,9 +154,9 @@ def ar_process():
     total = len(clientNames)
     zipClientName = []
     for i, clientName in enumerate(clientNames, start=1):
-        global DUEINVOICE
-        DUEINVOICE = ""
+        due_invoice = ""
         if (not "QCA Systems Ltd." in clientName):
+        #if ("GCT Canada Limited Partnership" in clientName):
             try:
                 print(f"\n▶ [{i}/{total}] {clientName}")
                 clientID = util.get_clientID(clientName)
@@ -181,13 +180,12 @@ def ar_process():
                 
                 print(f"  Balance  0-30: ${data['Age1']:,.2f}  |  31-45: ${data['Age2']:,.2f}  |  46-60: ${data['Age3']:,.2f}  |  61-90: ${data['Age4']:,.2f}  |  90+: ${data['Age5']:,.2f}")
 
-                tableContent = '<table border="1" width="500" style="border-collapse: collapse"><thead><tr style="text-align: center;"><th>Invoice</th><th>0-30</th><th>31-45</th><th>46-60</th><th>61-90</th><th>90+</th></tr></thead><tbody>'
-                tableContent += ar_generate_invoices_table(clientID)
-                tableContent += "</tbody></table>"
+                tableContent, due_invoice = ar_generate_invoices_table(clientID, due_invoice)
+                tableContent = '<table border="1" width="500" style="border-collapse: collapse"><thead><tr style="text-align: center;"><th>Invoice</th><th>0-30</th><th>31-45</th><th>46-60</th><th>61-90</th><th>90+</th></tr></thead><tbody>' + tableContent + "</tbody></table>"
 
                 check = ar_details(clientID)
                 if check:
-                    ar_create_record(clientID, clientName, email, fileName, pmList, tableContent)
+                    ar_create_record(clientID, clientName, email, fileName, pmList, tableContent, due_invoice)
                     if ar_need_zip(clientID, clientName):
                         zipClientName.append(clientName)
                 else:
@@ -208,12 +206,13 @@ def ar_review(clientID):
         print("❌ Error in get full invoice of vendor " + clientID)
 
 def ar_details(clientID):
+
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
     records = _safe_json(response, f"AR details API for client {clientID}")
     has_positive_invoice = False
     for r in records:
-        if r['Total'] <= 0 or clientID in EXCLUDE:
+        if r['Total'] <= 0:
             continue
         has_positive_invoice = True
         ar_download_proj_invoice_pdf(r['WBS1'], clientID)
@@ -284,6 +283,8 @@ def ar_download_statement_pdf(clientID, clientName):
 
 def ar_billing_term(projectId):
     projectIdClear = util.cleanup_projectID(projectId)
+    if projectIdClear == "":
+        return None
     url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/BillingTermsBO/{projectIdClear}?meta=channel%2Caccess"
     response = requests.get(url, headers = HEADERS)
     data = _safe_json(response, f"Billing terms API for project {projectIdClear}")
@@ -291,15 +292,19 @@ def ar_billing_term(projectId):
 
 def ar_check_due(invoice):
     projectId = invoice['InvoiceMainWBS1']
+    if projectId == "":
+        return None
     daysBeforeDue = ar_billing_term(projectId)
+    if daysBeforeDue == None:
+        return None
     return daysBeforeDue < int(invoice['DaysOut'])
 
-def ar_generate_invoices_table(clientID):
+def ar_generate_invoices_table(clientID, dueInvoice):
     url = "https://qcadeltek03.qcasystems.com/vantagepoint/vision/ARReview/"+ clientID
     response = requests.get(url, headers = HEADERS)
     records = _safe_json(response, f"AR review list API for client {clientID}")
     message = ""
-    global DUEINVOICE
+
     AGE_FIELDS = ["Age1", "Age2", "Age3", "Age4", "Age5"]
 
     for r in records:
@@ -315,6 +320,8 @@ def ar_generate_invoices_table(clientID):
         due_invoices = []
         for invoice in invoices:
             due = ar_check_due(invoice)
+            if due == None:
+                continue
             aging_amounts = {field: invoice.get(field, 0) for field in AGE_FIELDS}
 
             if not any(amount > 0 for amount in aging_amounts.values()):
@@ -334,9 +341,9 @@ def ar_generate_invoices_table(clientID):
 
         message += "".join(rows)
         if due:
-            DUEINVOICE += invoice.get("InvoiceNumber", "") + ", "
+            dueInvoice += invoice.get("InvoiceNumber", "") + ", "
 
-    return message
+    return message, dueInvoice
 
 def ar_download_proj_invoice_pdf(projectID, clientId):
     projectIDConverted = util.cleanup_projectID(projectID)
@@ -410,11 +417,7 @@ def ar_download_proj_invoice_pdf(projectID, clientId):
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
-                ar_create_record(clientId, "", "", fileName,"", "")
-            
-            url = "https://qcadeltek03.qcasystems.com/Vantagepoint/app/base/MakeVisionServiceRequest?method=DeleteAndStopReport"
-            payload = {"sessionID": session_token.group(1), "reportPath": report_path_raw}
-            response = requests.post(url, headers=HEADERS, json=payload )
+                ar_create_record(clientId, "", "", fileName,"", "", "")
             
         except Exception as e:
             print("❌ Error in download " + invoice['InvoiceNumber'] + " of " + clientName)
@@ -479,18 +482,18 @@ def ar_zipfile(clientID, clientName):
         excelName = os.path.join(ONEDRIVEDIR, WORKDIR, f"Job_{timestamp}.xlsx")
         wb.save(excelName)
 
-def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent):
+def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent, dueInvoice = ""):
     ws = wb.active
     ws.title = "Sheet1"
-    global DUEINVOICE
-    if DUEINVOICE != "":
-        DUEINVOICE = (
+    dueInvoiceInfo = ""
+    if dueInvoice != "":
+        dueInvoiceInfo = (
             "<p>We kindly remind you that the following invoices are due: "
             "<span style='background-color: yellow; color: red; font-weight: bold;'>"
-            + DUEINVOICE +
+            + dueInvoice +
             "</span> If you already paid this invoice or have any questions, let us know!</p>"
         )
-    body = "<html><p>Dear <b>" + clientName + "</b></p><p> Please find the attached file for <b> Statement of account - " + clientName + " as of " + STATEMENTDATE + "</b>.</p>" + tableContent + DUEINVOICE + OPTIONALMSG + BODY
+    body = "<html><p>Dear <b>" + clientName + "</b></p><p> Please find the attached file for <b> Statement of account - " + clientName + " as of " + STATEMENTDATE + "</b>.</p>" + tableContent + dueInvoiceInfo + OPTIONALMSG + BODY
     row = [clientID, MAIL_FROM, email, pmList + CC, SUBJECT + clientName + " as of " + STATEMENTDATE, fileName, WORKDIR+"\\ar_export\\"+fileName, body, clientName]
     ws.append(row)
     global RECORDS

@@ -8,7 +8,7 @@ from datetime import date, time
 from pathlib import Path
 import logging
 import time
-
+import json
 
 def download_AR(HEADERS):
     try:
