@@ -9,8 +9,6 @@ from pathlib import Path
 import win32com.client
 from io import StringIO
 import os
-import random
-import string
 import hashlib
 import shutil
 import stat
@@ -89,19 +87,29 @@ def get_search_option_project_total(pkey):
 
 
 def update_template():
-    username = getpass.getuser()  # safer than os.getlogin()
+    """
+    Updates the local template environment by syncing files from SharePoint.
 
+    If the SharePoint template cannot be found or copied, falls back to
+    downloading the supporting documents from Google Drive so the task can
+    continue.
+    """
+    # Define local destination path
+    save_path = Path("C:/temp/revenue_accrual")
+
+    # Fetch user environment details
+    username = getpass.getuser()  # Safer than os.getlogin()
     SHAREPOINT_SUBPATH = Path("03 Accounting/400 Process Improvement/Automation/template/Rev-Gen")
     SHAREPOINT_LIBRARY = "QCA Accounting Dept - Documents"
 
+    # Attempt to locate OneDrive root directory
     onedrive_root = util.get_onedrive_path()
-
     source_path = None
     candidates = []
 
+    # SharePoint libraries sync either inside the OneDrive folder or at the user home level
     if onedrive_root:
-        print(f"Success get the OneDrive path: {onedrive_root}")
-        # SharePoint libraries sync either inside the OneDrive folder or at the user home level
+        print(f"Success getting the OneDrive path: {onedrive_root}")
         candidates = [
             onedrive_root / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH,
             Path.home() / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH,
@@ -110,24 +118,23 @@ def update_template():
         print("OneDrive path not found. Trying fallback SharePoint library location.")
         candidates = [Path.home() / SHAREPOINT_LIBRARY / SHAREPOINT_SUBPATH]
 
+    # Helper: download the supporting documents from Google Drive as a fallback
+    def _download_from_gdrive():
+        util.download_from_gdrive(file_id="1PnuEvp3_rMfcDVb_qTXYn2ykbRYiS4_-", file_name="0 JTD Billed Invoice Summary.xlsx", save_dir=save_path)
+        util.download_from_gdrive(file_id="1ds3nFA01TvC072hLLA-7EzgEEI4erhfb", file_name="1 2 3 JTD Billing.xlsx", save_dir=save_path)
+        util.download_from_gdrive(file_id="1ijw6vg0t3zzYdG1Y_2pO37M2iB3Smngi", file_name="4 5 Budget _Complete.xlsx", save_dir=save_path)
+        util.download_from_gdrive(file_id="1bstqKI9GU3JqknlKtnHp4CHzD0Gb9Dce", file_name="6 New Model_Earned Revenue Accrual.xlsx", save_dir=save_path)
+
+    # Search for the first valid candidate path
     for candidate in candidates:
         if candidate.exists():
             source_path = candidate
             break
 
-    save_path = Path("C:/temp/revenue_accrual")
-
-    # Validate source
-    if source_path is None:
-        print(f"❌ Template folder not found. Checked:")
-        for c in candidates:
-            print(f"   • {c}")
-        print(f"Please sync the SharePoint library '{SHAREPOINT_LIBRARY}' via OneDrive before running this task.")
-        return
-
-    # Remove destination if it exists
+    # Clean up existing local destination directory if it exists
     if save_path.exists():
         try:
+            # Fallback function to handle read-only files during deletion
             def _remove_readonly(func, path, _):
                 os.chmod(path, stat.S_IWRITE)
                 func(path)
@@ -135,6 +142,7 @@ def update_template():
             print(f"💥 Cleared directory: {save_path}")
         except Exception:
             try:
+                # Force delete via Windows command line if shutil fails
                 subprocess.run(
                     ["cmd", "/c", "rd", "/s", "/q", str(save_path)],
                     check=True,
@@ -142,14 +150,25 @@ def update_template():
                 print(f"💥 Force deleted directory: {save_path}")
             except Exception as e:
                 print(f"❌ Cleanup error: {e}")
-                return
 
-    # Copy fresh
+    # Copy fresh template folder from SharePoint; fall back to Google Drive
+    if source_path is None:
+        checked_paths = ", ".join([str(p) for p in candidates])
+        print(f"⚠️ Template folder not found. Checked: {checked_paths}")
+        print("Downloading files from Google Drive instead...")
+        _download_from_gdrive()
+        print(f"🎉 Templates downloaded from Google Drive to: {save_path}")
+        return
+
     try:
         shutil.copytree(source_path, save_path)
         print(f"✅ Copied template to: {save_path}")
     except Exception as e:
         print(f"❌ Copy failed: {e}")
+        print("Downloading files from Google Drive instead...")
+        _download_from_gdrive()
+        print(f"🎉 Templates downloaded from Google Drive to: {save_path}")
+
 
 
 def append_to_project_list(url, columnName, needFilter = False):

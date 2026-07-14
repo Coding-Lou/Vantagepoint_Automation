@@ -15,33 +15,6 @@ global searchOptions
 searchOptions = None
 global targetFile
 
-def setup_logger(file_name="program_log.txt"):
-    # 统一路径：确保这里和你 final_step 里的路径逻辑一致
-    log_dir = r"C:\temp" 
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
-    log_path = os.path.join(log_dir, file_name)
-
-    logger = logging.getLogger("MyLogger")
-    logger.setLevel(logging.DEBUG)
-
-    # 清除旧的 handler 防止重复打印
-    if logger.handlers:
-        logger.handlers.clear()
-
-    # 创建 Handler
-    file_handler = logging.FileHandler(log_path, encoding='utf-8')
-    
-    # 关键点：让日志立即写入硬盘，不要等缓存
-    # 在某些环境下，如果不显式设置，程序崩溃时日志就丢了
-    
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    
-    return logger
 
 def update_templete(templete_abspath, copy_to_template = True):
     # 1. Initialize the Path object
@@ -301,7 +274,7 @@ def download_expenses(copy_to_template = True):
             os.replace(temp_file, csvName)
 
     except Exception as e:
-        print("⚠️ Failed to download the invoices register:", e)
+        print("⚠️ Failed to download the invoices Expense:", e)
 
     # try:
     #     util.csv_to_xlsx(csvName, output_file, "exp export", False, 0, 13)
@@ -500,11 +473,7 @@ def copy_to_template():
 
     import win32com.client
     import pythoncom
-    log = setup_logger()
-    log.info("--- Start logging ---")
-    log.info("--- pythoncom.CoInitialize() ---")
     pythoncom.CoInitialize()
-    log.info('--- excel = win32.DispatchEx("Excel.Application") ---')
     excel = win32com.client.DispatchEx("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
@@ -520,7 +489,6 @@ def copy_to_template():
             except pythoncom.com_error as e:
                 if getattr(e, 'hresult', None) != CALLEE_BUSY:
                     raise
-                log.info(f"⚠️ COM busy, retrying {i+1}/{retries}...")
                 time.sleep(delay)
         raise RuntimeError("Excel remained busy after retries")
 
@@ -534,7 +502,6 @@ def copy_to_template():
         for file_key, sheet, cell, is_last in tasks:
             input_path = os.path.join(base_path, f"{file_key}_{today_str}.csv")
             if os.path.exists(input_path):
-               log.info(f"Copy from {file_key} {sheet} {cell}")
                util.excel_full_copy(
                     inputFile=input_path, 
                     inputSheet=None, 

@@ -82,9 +82,10 @@ def retrieve_open_po_report():
     except Exception as e:
         print("⚠️ Failed to download the Close PO:", e)
 
-def get_3way_result(vendor = ""):
+def get_2way_result(vendor = ""):
+
     try:
-        url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/DataEntry/OpenPOVoucherDetail/b2b2b1937e7c4e5cae198ae644e0e509/{vendor}/3"
+        url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/DataEntry/OpenPOVoucherDetail/b2b2b1937e7c4e5cae198ae644e0e509/{vendor}/2"
         response = requests.get(url, headers=HEADERS)
         data = response.json()
         return data
@@ -130,6 +131,7 @@ def get_project_information(po_masterKey = ""):
     
     except Exception as e:
         print(f"⚠️ Failed to retrieve project information of PO {po_masterKey}: {e}")
+        return None
 
 
 def get_all_vendors_result(vendors: list):
@@ -138,7 +140,7 @@ def get_all_vendors_result(vendors: list):
     all_po_info = []
 
     for vendor in vendors:
-        data = get_3way_result(vendor)
+        data = get_2way_result(vendor)
 
         if isinstance(data, dict):
             data = data.get("data", [])
@@ -155,7 +157,10 @@ def get_all_vendors_result(vendors: list):
     for master_key in all_pos:
         row = get_project_information(master_key)
         # print(row)
-        all_po_info.append(row)
+        if row:
+            all_po_info.append(row)
+        else:
+            print(f"⚠️ Skipped PO {master_key}: no project information returned.")
 
     return all_data, all_po_info
 

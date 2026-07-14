@@ -317,7 +317,6 @@ def ar_generate_invoices_table(clientID, dueInvoice):
         response = requests.get(url, headers=HEADERS)
         invoices = _safe_json(response, f"AR review detail API for project {projectID} and client {clientID}")
         rows = []
-        due_invoices = []
         for invoice in invoices:
             due = ar_check_due(invoice)
             if due == None:
@@ -328,7 +327,7 @@ def ar_generate_invoices_table(clientID, dueInvoice):
                 continue
 
             if due:
-                due_invoices.append(invoice.get("InvoiceNumber", ""))
+                dueInvoice += invoice.get("InvoiceNumber", "") + ", "
             
             color = "red" if due else "inherit"
 
@@ -340,8 +339,6 @@ def ar_generate_invoices_table(clientID, dueInvoice):
             rows.append("".join(row))
 
         message += "".join(rows)
-        if due:
-            dueInvoice += invoice.get("InvoiceNumber", "") + ", "
 
     return message, dueInvoice
 
@@ -432,7 +429,7 @@ def ar_get_pm_list(clientID):
     for proj in projList:
         if proj['Age2'] > 0 or proj['Age3'] > 0 or proj['Age4'] > 0 or proj['Age5'] > 0:
             projName = proj['WBS1']
-            projName = util.cleanup_projectName(projName)
+            projName = util.cleanup_projectID(projName)
             url = f"https://qcadeltek03.qcasystems.com/Vantagepoint/vision/project/{projName}/plans/liveplan?missingjtd=no"
             response = requests.get(url, headers=HEADERS)
             data = _safe_json(response, f"Project plan API for project {projName}")[0]
@@ -482,15 +479,15 @@ def ar_zipfile(clientID, clientName):
         excelName = os.path.join(ONEDRIVEDIR, WORKDIR, f"Job_{timestamp}.xlsx")
         wb.save(excelName)
 
-def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent, dueInvoice = ""):
+def ar_create_record(clientID, clientName, email, fileName, pmList, tableContent, dueInvoices = ""):
     ws = wb.active
     ws.title = "Sheet1"
     dueInvoiceInfo = ""
-    if dueInvoice != "":
+    if dueInvoices != "":
         dueInvoiceInfo = (
             "<p>We kindly remind you that the following invoices are due: "
             "<span style='background-color: yellow; color: red; font-weight: bold;'>"
-            + dueInvoice +
+            + dueInvoices +
             "</span> If you already paid this invoice or have any questions, let us know!</p>"
         )
     body = "<html><p>Dear <b>" + clientName + "</b></p><p> Please find the attached file for <b> Statement of account - " + clientName + " as of " + STATEMENTDATE + "</b>.</p>" + tableContent + dueInvoiceInfo + OPTIONALMSG + BODY

@@ -356,13 +356,28 @@ def main() -> int:
     # UI mode: Launch graphical interface (no arguments provided)
     return launch_ui()
 
-
-
-
-if __name__ == "__main__":
+def unit_test():
+    #login.sso_login()
+    import core.close_po as cp
+    cp.main()
+    '''
+    import core.project_status as ps
+    ps.main()
+    
     #main()
+    #login.sso_login()
+    import core.revenue_accrual as ra   
+    ra.update_template()
+    
+    import domain.adapters.anixter as anixter
+    anixter_parser = anixter.AnixterParser()
+    invoice_data = anixter_parser.parse("ANIXTER 24135 763339641.pdf")
+    print(invoice_data.__dict__)
 
-    '''    
+    import tools.matcher as matcher
+    score = matcher.similarity_engine(invoice_data.items[0].description, "I/O END MODULE")
+    print(score)
+       
     import core.revenue_accrual as ra
     login.sso_login()
     ra.main()
@@ -373,8 +388,15 @@ if __name__ == "__main__":
     
     import core.daily_received as dr
     dr.main()
-    '''
     
+    import core.statement_check as sc
+    sc.test()
+    '''
+
+if __name__ == "__main__":
+    '''
+    unit_test()
+'''
     util.init_workdir()
 
     exit_code = main()
@@ -385,4 +407,3 @@ if __name__ == "__main__":
         # Only print completion message for CLI mode
         pass
     sys.exit(exit_code)
-    

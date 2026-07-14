@@ -1,8 +1,38 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import Union
+from io import BytesIO
+import asyncio
+import re
 import requests
+from PIL import Image
 import tools.util as util
 
+
+async def _recognize_text_uwp(image_bytes: bytes) -> str:
+    """Run OCR via the OS-provided Windows.Media.Ocr engine (no ML model download)."""
+    from winsdk.windows.media.ocr import OcrEngine
+    from winsdk.windows.storage.streams import InMemoryRandomAccessStream, DataWriter
+    from winsdk.windows.graphics.imaging import BitmapDecoder, SoftwareBitmap, BitmapPixelFormat, BitmapAlphaMode
+
+    stream = InMemoryRandomAccessStream()
+    writer = DataWriter(stream.get_output_stream_at(0))
+    writer.write_bytes(image_bytes)
+    await writer.store_async()
+    await writer.flush_async()
+    stream.seek(0)
+
+    decoder = await BitmapDecoder.create_async(stream)
+    bitmap = await decoder.get_software_bitmap_async()
+    # OcrEngine requires BGRA8 + premultiplied alpha regardless of source format
+    bitmap = SoftwareBitmap.convert(bitmap, BitmapPixelFormat.BGRA8, BitmapAlphaMode.PREMULTIPLIED)
+
+    engine = OcrEngine.try_create_from_user_profile_languages()
+    if engine is None:
+        raise RuntimeError("No OCR language pack installed for this Windows user profile")
+
+    result = await engine.recognize_async(bitmap)
+    return result.text
 
 
 def check_statement(vendor_key: str, invoice_number: str) -> bool | None:
@@ -94,6 +124,35 @@ def main(vendor_key: str = None, invoice_numbers: str = None):
     for invoice_number in not_vouched_list:
         print(f"{invoice_number} not been vouched")
 
+def retrieve_numbers_from_image(image_input: Union[str, Image.Image]) -> list[str]:
+    """
+    Retrieve invoice numbers or digit sequences from an image using OCR.
+
+    Args:
+        image_input: A local file path (str) or an in-memory PIL Image
+            (e.g. pasted from the GUI clipboard).
+
+    Returns:
+        list[str]: Extracted digit strings, e.g. ['12345', '67890'].
+        Returns [] if no digits are found or the image can't be processed.
+    """
+    try:
+        if isinstance(image_input, str):
+            image = Image.open(image_input)
+        elif isinstance(image_input, Image.Image):
+            image = image_input
+        else:
+            raise TypeError(f"image_input must be str or PIL.Image.Image, got {type(image_input)}")
+
+        buffer = BytesIO()
+        image.convert("RGB").save(buffer, format="PNG")
+
+        text = asyncio.run(_recognize_text_uwp(buffer.getvalue()))
+
+        return re.findall(r"\d+", text)
+    except Exception as e:
+        print(f"retrieve_numbers_from_image error: {e}")
+        return []
 
 if __name__ == "__main__":
     main()
